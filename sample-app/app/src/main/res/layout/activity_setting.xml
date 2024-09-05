@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="@dimen/setting_padding_parent">
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/tv_Setting_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:textStyle="bold"
+        android:textColor="@color/black"
+        android:text="@string/configuration_options"
+        android:textSize="@dimen/setting_text_size"  />
+
+    <TextView
+        android:id="@+id/tv_setting_done"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:textColor="#64b5f6"
+        android:text="@string/save"
+        android:textSize="@dimen/setting_text_size" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/settings_recycle_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_Setting_title"
+        android:layout_marginTop="@dimen/setting_list_margin_top" />
+
+</RelativeLayout>

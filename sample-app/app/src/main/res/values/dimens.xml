@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="setting_text_size">16sp</dimen>
+    <dimen name="setting_padding_parent">16dp</dimen>
+    <dimen name="setting_list_margin_top">8dp</dimen>
+    <dimen name="rg_log_level_option_mrgin_top">10dp</dimen>
+    <dimen name="ll_parent_setting_radio_padding_start">10dp</dimen>
+    <dimen name="ll_parent_setting_radio_padding_top">16dp</dimen>
+    <dimen name="spinner_layout_width">60dp</dimen>
+</resources>
