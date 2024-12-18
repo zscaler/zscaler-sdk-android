@@ -1,42 +1,39 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.configuration
 
 import android.content.Context
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import android.widget.BaseAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
-import com.zscaler.sdk.android.configuration.ZscalerSDKConfiguration
 import com.zscaler.sdk.android.configuration.ZscalerSDKConfiguration.*
 import com.zscaler.sdk.demoapp.databinding.ItemSettingBinding
 import com.zscaler.sdk.demoapp.databinding.ItemSettingRadioBinding
 
-class SettingsAdapter(
+class ConfigAdapter(
     private val context: Context,
     private val settingsList: MutableList<SettingItem>,
-) : RecyclerView.Adapter<SettingsAdapter.SettingsViewHolder>() {
+) : RecyclerView.Adapter<ConfigAdapter.ConfigViewHolder>() {
 
     companion object {
         private const val VIEW_TYPE_TOGGLE = 1
         private const val VIEW_TYPE_RADIO_BUTTONS = 2
     }
 
-    class SettingsViewHolder(val binding: ViewBinding) :
+    class ConfigViewHolder(val binding: ViewBinding) :
         RecyclerView.ViewHolder(binding.root)
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SettingsViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ConfigViewHolder {
         return when (viewType) {
             VIEW_TYPE_TOGGLE -> {
                 val binding =
                     ItemSettingBinding.inflate(LayoutInflater.from(context), parent, false)
-                SettingsViewHolder(binding)
+                ConfigViewHolder(binding)
             }
 
             VIEW_TYPE_RADIO_BUTTONS -> {
                 val binding =
                     ItemSettingRadioBinding.inflate(LayoutInflater.from(context), parent, false)
-                SettingsViewHolder(binding)
+                ConfigViewHolder(binding)
             }
 
             else -> throw IllegalArgumentException("Invalid view type")
@@ -52,7 +49,7 @@ class SettingsAdapter(
         }
     }
 
-    override fun onBindViewHolder(holder: SettingsViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: ConfigViewHolder, position: Int) {
         val settingItem = settingsList[position]
 
         when (getItemViewType(position)) {
@@ -69,6 +66,7 @@ class SettingsAdapter(
                     ZscalerSDKSetting.zscalerSDKConfigurationMap[settingItem.type] =
                         binding.toggle.isChecked
                 }
+                binding.toggle.text = settingItem.type.name
             }
 
             VIEW_TYPE_RADIO_BUTTONS -> {

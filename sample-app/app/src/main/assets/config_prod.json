@@ -1,0 +1,14 @@
+{
+    "urls": {
+        "zpn": "",
+        "direct": "",
+        "blockedApp_1": "",
+        "subDomainApp": "",
+        "domainWithUrlParams": "",
+        "incorrectUrl": "",
+        "mediumFileDownload": "",
+        "zpnLargeFileDownload": "",
+        "configuredHttpApp": ""
+    }
+}
+

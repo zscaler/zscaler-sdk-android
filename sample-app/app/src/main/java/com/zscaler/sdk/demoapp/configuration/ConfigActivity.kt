@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.configuration
 
 import android.os.Bundle
 import android.util.Log
@@ -6,14 +6,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.zscaler.sdk.android.ZscalerSDK
 import com.zscaler.sdk.android.exception.ZscalerSDKException
+import com.zscaler.sdk.demoapp.R
 import com.zscaler.sdk.demoapp.databinding.ActivitySettingBinding
+import com.zscaler.sdk.demoapp.networking.ParentAppRetrofitClient
 
-class SettingActivity : AppCompatActivity() {
+class ConfigActivity : AppCompatActivity() {
     private val TAG = "SettingActivity"
     private lateinit var binding: ActivitySettingBinding
     private lateinit var settingsList: MutableList<SettingItem>
     private var zscalerSDKConfigurationMap = mutableMapOf<SettingType, Boolean>()
-    private lateinit var settingsAdapter: SettingsAdapter
+    private lateinit var settingsAdapter: ConfigAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,10 +46,10 @@ class SettingActivity : AppCompatActivity() {
                 true
             ),
             SettingItem(
-                SettingType.BLOCK_JB_TRAFFIC,
+                SettingType.BLOCK_ROOT_TRAFFIC,
                 getString(R.string.setting_title_block_root_traffic),
                 getString(R.string.setting_desc_block_root_traffic),
-                zscalerSDKConfigurationMap.getOrDefault(SettingType.BLOCK_JB_TRAFFIC, false), true
+                zscalerSDKConfigurationMap.getOrDefault(SettingType.BLOCK_ROOT_TRAFFIC, false), true
             ),
             SettingItem(
                 SettingType.BLOCK_ZPA_CONNECTION,
@@ -71,11 +73,11 @@ class SettingActivity : AppCompatActivity() {
                 false
             )
         )
-        settingsAdapter = SettingsAdapter(this, settingsList)
+        settingsAdapter = ConfigAdapter(this, settingsList)
         binding.settingsRecycleView.layoutManager = LinearLayoutManager(this)
         binding.settingsRecycleView.adapter = settingsAdapter
         binding.tvSettingDone.setOnClickListener {
-            ManualRetrofitApiClient.clearRetroFitInstance()
+            ParentAppRetrofitClient.clearRetroFitInstance()
             try {
                 ZscalerSDK.setConfiguration(ZscalerSDKSetting.getZscalerSDKConfiguration())
             } catch (exception: ZscalerSDKException) {

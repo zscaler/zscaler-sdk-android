@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.util
 
 import android.content.Context
 import android.os.Build

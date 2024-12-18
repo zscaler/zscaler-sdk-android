@@ -8,7 +8,6 @@
         android:id="@+id/title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Title"
         android:textSize="16sp"
         android:textStyle="bold" />
 
@@ -18,7 +17,6 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/title"
         android:layout_marginTop="6dp"
-        android:text="Description"
         android:textSize="14sp" />
 
     <androidx.appcompat.widget.SwitchCompat
@@ -26,5 +24,6 @@
         android:layout_width="50dp"
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
-        android:layout_centerVertical="false" />
+        android:layout_centerVertical="false"
+        android:textSize="0sp"/>
 </RelativeLayout>

@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.service
 
 import android.app.NotificationManager
 import android.app.Service
@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import com.zscaler.sdk.demoapp.constants.NOTIFICATION_ID
 
 
 /**

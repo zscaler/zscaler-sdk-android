@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.view
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
@@ -39,10 +40,26 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.ktx.initialize
 import com.zscaler.sdk.android.ZscalerSDK
+import com.zscaler.sdk.android.configuration.ZscalerSDKConfiguration
 import com.zscaler.sdk.android.exception.ZscalerSDKException
 import com.zscaler.sdk.android.networking.ZscalerSDKRetrofit
 import com.zscaler.sdk.android.notification.ZscalerSDKNotificationEnum
+import com.zscaler.sdk.demoapp.BuildConfig
+import com.zscaler.sdk.demoapp.R
+import com.zscaler.sdk.demoapp.util.ProxyUtility
+import com.zscaler.sdk.demoapp.configuration.ConfigActivity
+import com.zscaler.sdk.demoapp.configuration.ZscalerSDKSetting
+import com.zscaler.sdk.demoapp.constants.NOTIFICATION_CHANNEL_ID
+import com.zscaler.sdk.demoapp.constants.NOTIFICATION_ID
+import com.zscaler.sdk.demoapp.constants.ZDKTunnel
+import com.zscaler.sdk.demoapp.constants.zpaEmptyHtml
+import com.zscaler.sdk.demoapp.constants.zpaErrorHtml
+import com.zscaler.sdk.demoapp.constants.zpaNotConnectedHtml
 import com.zscaler.sdk.demoapp.databinding.ActivityMainBinding
+import com.zscaler.sdk.demoapp.constants.RequestMethod
+import com.zscaler.sdk.demoapp.networking.ParentAppRetrofitClient
+import com.zscaler.sdk.demoapp.service.NotificationCancellationService
+import com.zscaler.sdk.demoapp.util.ZipUtility
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,20 +68,20 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
 
 class MainActivity : AppCompatActivity() {
 
     private val TAG = "MainActivity"
     private lateinit var binding: ActivityMainBinding
-    private lateinit var logFileName: String
+    private lateinit var logsZipFileName: String
     private lateinit var mainViewModel: MainViewModel
     private var isRetrofitClientNeeded: Boolean = false
-    private var httpMethod: HttpMethod = HttpMethod.WEB
+    private lateinit var webView: WebView
+    private var requestMethod: RequestMethod = RequestMethod.WEB
     private lateinit var broadcastReceiver: BroadcastReceiver
     private lateinit var notificationManager: NotificationManager
     private val requestNotificationCode = 101
+    private lateinit var sdkConfiguration: ZscalerSDKConfiguration
     private val WRITE_EXTERNAL_STORAGE_REQUEST_CODE = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,6 +99,8 @@ class MainActivity : AppCompatActivity() {
         mainViewModel = viewModelProvider[MainViewModel::class.java]
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         setContentView(binding.root)
+        sdkConfiguration = ZscalerSDKSetting.getZscalerSDKConfiguration()
+        configureWebView()
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -95,10 +114,42 @@ class MainActivity : AppCompatActivity() {
         spinnerListener()
         createNotificationChannel()
         initZdkConfiguration()
+        addEventLogsToUi()
+    }
+
+    override fun onResume() {
+        if (sdkConfiguration.automaticallyConfigureWebviews !=
+            ZscalerSDKSetting.getZscalerSDKConfiguration().automaticallyConfigureWebviews) {
+            sdkConfiguration = ZscalerSDKSetting.getZscalerSDKConfiguration()
+            configureWebView()
+        } else {
+            sdkConfiguration = ZscalerSDKSetting.getZscalerSDKConfiguration()
+        }
+        super.onResume()
     }
 
     private fun initZdkConfiguration() {
-        binding.llZscalerConfig.setOnClickListener { startActivity(Intent(this@MainActivity, SettingActivity::class.java)) }
+        binding.llZscalerConfig.setOnClickListener { startActivity(Intent(this@MainActivity, ConfigActivity::class.java)) }
+    }
+
+    private fun addEventLogsToUi() {
+        binding.llEventLogs.setOnClickListener { startActivity(Intent(this@MainActivity, EventLogViewActivity::class.java)) }
+    }
+
+    private fun configureWebView() {
+        if (binding.frameLayout.getChildAt(0) != null) {
+            binding.frameLayout.removeViewAt(0)
+        }
+        if (sdkConfiguration.automaticallyConfigureWebviews) {
+            binding.frameLayout.addView(WebView(this))
+        } else {
+            val zscalerSDKWebView = ZscalerSDK.setUpWebView()
+            if (zscalerSDKWebView != null) {
+                binding.frameLayout.addView(zscalerSDKWebView)
+            } else {
+                binding.frameLayout.addView(WebView(this))
+            }
+        }
     }
 
     /**
@@ -109,6 +160,15 @@ class MainActivity : AppCompatActivity() {
         FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(!BuildConfig.DEBUG)
     }
 
+    private fun unregisterZDKReceiver() {
+        try {
+            unregisterReceiver(broadcastReceiver)
+        } catch (e: IllegalArgumentException) {
+            //do nothing if receiver is not already registered
+        }
+    }
+
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun registerZDKReceiver() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -120,6 +180,14 @@ class MainActivity : AppCompatActivity() {
                 val notificationMessage = intent?.getStringExtra(ZscalerSDK.NOTIFICATION_MESSAGE)
                 Log.d(TAG, "onReceive() called with: notificationCode = $notificationCode, notificationMessage = $notificationMessage")
                 notificationCode?.takeIf() {it > -1
+                    if (notificationCode == ZscalerSDKNotificationEnum.ZDK_TUNNEL_READY_TO_USE.ordinal ||
+                        notificationCode == ZscalerSDKNotificationEnum.ZDK_TUNNEL_DISCONNECTED.ordinal) {
+                        ParentAppRetrofitClient.clearRetroFitInstance()
+                        clearWebView()
+                    }
+                    if (notificationCode == ZscalerSDKNotificationEnum.ZDK_TUNNEL_DISCONNECTED.ordinal) {
+                        unregisterZDKReceiver()
+                    }
                     createNotification(ZscalerSDKNotificationEnum.values()[notificationCode].message, ZscalerSDKNotificationEnum.values()[notificationCode].message)
                 }
             }
@@ -143,12 +211,12 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     isRetrofitClientNeeded = when (position) {
                         1, 2 -> {
-                            httpMethod = HttpMethod.entries.toTypedArray()[position.minus(1)]
+                            requestMethod = RequestMethod.entries.toTypedArray()[position.minus(1)]
                             true
                         }
 
                         else -> {
-                            httpMethod = HttpMethod.WEB
+                            requestMethod = RequestMethod.WEB
                             false
                         }
                     }
@@ -167,8 +235,12 @@ class MainActivity : AppCompatActivity() {
         } else if (mainViewModel.getSelectedTunnel() == ZDKTunnel.ZERO_TRUST) {
             mainViewModel.stopTunnel(resetStatusText = { getString(R.string.status_off) })
         }
+        if (sdkConfiguration.automaticallyConfigureRequests) {
+            ParentAppRetrofitClient.clearRetroFitInstance()
+        }
+        clearWebView()
         try {
-            unregisterReceiver(broadcastReceiver)
+            unregisterZDKReceiver()
         } catch (e: RuntimeException) {
             Log.e(TAG, "onDestroy() :: exception raised while unregistering broadcastReceiver : ", e)
         }
@@ -177,7 +249,8 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun enableBrowsing() {
-        binding.webview.settings.javaScriptEnabled = true
+        val webView = binding.frameLayout.getChildAt(0) as WebView
+        webView.settings.javaScriptEnabled = true
         addMessageOnWebView(zpaNotConnectedHtml)
         binding.goButton.setOnClickListener {
             var url = binding.browserUrlTextField.text.toString()
@@ -187,28 +260,34 @@ class MainActivity : AppCompatActivity() {
                 ZdkDialog.showMessageDialog(this, getString(R.string.enter_valid_url))
             } else {
                 url = addHttpsIfNeeded(url)
-                when (httpMethod) {
-                    HttpMethod.GET ->
-                            if (ZscalerSDKSetting.getZscalerSDKConfiguration().automaticallyConfigureRequests) {
-                                mainViewModel.getData(url = url.ensureEndsWithSlash())
+                when (requestMethod) {
+                    RequestMethod.GET ->
+                            if (sdkConfiguration.automaticallyConfigureRequests) {
+                                mainViewModel.loadWithAutomaticConfig(url = url.ensureEndsWithSlash())
                             } else {
-                                mainViewModel.loadManuallyWithProxyInfo(url.ensureEndsWithSlash(), true)
+                                mainViewModel.loadWithSemiAutomaticConfig(url.ensureEndsWithSlash(), true)
                             }
-                    HttpMethod.POST ->
-                        if (ZscalerSDKSetting.getZscalerSDKConfiguration().automaticallyConfigureRequests) {
-                            mainViewModel.postData(url = url.ensureEndsWithSlash(), params = emptyMap())
+                    RequestMethod.POST ->
+                        if (sdkConfiguration.automaticallyConfigureRequests) {
+                            mainViewModel.loadPostDataWithAutomaticConfig(url = url.ensureEndsWithSlash(), params = emptyMap())
                         } else {
-                            mainViewModel.loadManuallyWithProxyInfo(url.ensureEndsWithSlash(), false)
+                            mainViewModel.loadWithSemiAutomaticConfig(url.ensureEndsWithSlash(), false)
                         }
-                    HttpMethod.WEB -> loadUrlInWebView(url = url)
+                    RequestMethod.WEB ->
+                        if (sdkConfiguration.automaticallyConfigureWebviews) {
+                            loadInWebViewWithAutomaticConfig(url = url)
+                        } else {
+                            loadInWebViewWithSemiAutomaticConfig(url)
+                        }
                 }
             }
         }
         mainViewModel.responseData.observe(this) { responseData ->
-            binding.webview.loadUrl("about:blank")
-            binding.webview.clearCache(true)
-            if (httpMethod != HttpMethod.WEB) {
-                binding.webview.visibility = View.GONE
+            val webView = binding.frameLayout.getChildAt(0) as WebView
+            webView.loadUrl("about:blank")
+            webView.clearCache(true)
+            if (requestMethod != RequestMethod.WEB) {
+                webView.visibility = View.GONE
                 binding.tvResponse.visibility = View.VISIBLE
                 if (responseData != null) {
                     if (responseData.toString()
@@ -228,9 +307,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadUrlInWebView(url: String) {
+    private fun loadInWebViewWithAutomaticConfig(url: String) {
         binding.tvResponse.visibility = View.GONE
-        binding.webview.visibility = View.VISIBLE
+        val webView = binding.frameLayout.getChildAt(0) as WebView
+        webView.visibility = View.VISIBLE
         var formattedUrl = url.trim()
         if (!formattedUrl.startsWith("http://")
             && !formattedUrl.startsWith("https://")
@@ -238,16 +318,16 @@ class MainActivity : AppCompatActivity() {
         ) {
             formattedUrl = "https://$formattedUrl"
         }
-        binding.webview.clearCache(true)
-        binding.webview.webViewClient = object : WebViewClient() {
+        webView.clearCache(true)
+        webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                binding.webview.contentDescription = "Page is loading..."
+                webView.contentDescription = "Page is loading..."
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                binding.webview.contentDescription = "Page loaded successfully"
+                webView.contentDescription = "Page loaded successfully"
             }
             override fun onReceivedError(
                 view: WebView?,
@@ -256,16 +336,22 @@ class MainActivity : AppCompatActivity() {
             ) {
                 super.onReceivedError(view, request, error)
                 addMessageOnWebView(zpaErrorHtml)
-                binding.webview.contentDescription = "Failed to load the page"
+                webView.contentDescription = "Failed to load the page"
             }
         }
-        binding.webview.loadUrl(formattedUrl)
+        webView.loadUrl(formattedUrl)
+    }
+
+    private fun loadInWebViewWithSemiAutomaticConfig(url: String) {
+       val zscalerSDKWebView = ZscalerSDK.setUpWebView()
+       zscalerSDKWebView?.loadUrl(url)
     }
 
     private fun addMessageOnWebView(htmlText: String) {
         if (mainViewModel.getSelectedTunnel() == ZDKTunnel.NO_SELECTION) {
             val encodedHtml = Base64.encodeToString(htmlText.toByteArray(), Base64.NO_PADDING)
-            binding.webview.loadData(encodedHtml, "text/html", "base64")
+            val webView = binding.frameLayout.getChildAt(0) as WebView
+            webView.loadData(encodedHtml, "text/html", "base64")
         }
     }
 
@@ -275,8 +361,9 @@ class MainActivity : AppCompatActivity() {
             reloadWebView()
             if (isChecked) {
                 // everytime clear any previously manually created retrofit when tunnel status changes.
-                ManualRetrofitApiClient.clearRetroFitInstance()
+                ParentAppRetrofitClient.clearRetroFitInstance()
                 ZscalerSDKRetrofit.clearInstance()
+                clearWebView()
                 registerZDKReceiver()
                 binding.tvPreStatus.text = getString(R.string.status_format, "CONNECTING")
 
@@ -300,6 +387,7 @@ class MainActivity : AppCompatActivity() {
                             binding.tvPreStatus.visibility = View.VISIBLE
                             binding.tvPreStatus.text =
                                 getString(R.string.error_status_format, it.toString())
+                            mainViewModel.zdkStatus.removeObservers(this)
                             binding.zeroTrustToggle.isEnabled = true
                         })
                     binding.zeroTrustToggle.isEnabled = false
@@ -315,19 +403,14 @@ class MainActivity : AppCompatActivity() {
                     addMessageOnWebView(zpaEmptyHtml)
                 }
             } else {
-                unregisterReceiver(broadcastReceiver)
-                stopService(Intent(this, NotificationCancellationService::class.java))
-                notificationManager.cancel(NOTIFICATION_ID)
-                Log.d(
-                    TAG,
-                    mainViewModel.stopTunnel(resetStatusText = { getString(R.string.status_off) })
-                        .toString()
-                )
-                mainViewModel.stopTunnelStatusUpdates()
-
-                binding.zeroTrustToggle.isEnabled = true
-                binding.zeroTrustToggle.contentDescription = "OFF"
+                ProxyUtility.clearWebViewProxy()
+                clearWebView()
+                unregisterZDKReceiver()
+                mainViewModel.stopTunnel(resetStatusText = { getString(R.string.status_off) })
                 binding.preLoginToggle.contentDescription = "OFF"
+                binding.zeroTrustToggle.contentDescription = "OFF"
+                binding.zeroTrustToggle.isEnabled = true
+                mainViewModel.stopTunnelStatusUpdates()
                 binding.tvPreStatus.text = getString(R.string.status_format, "OFF")
                 binding.tvPreStatus.visibility = View.INVISIBLE
                 addMessageOnWebView(zpaNotConnectedHtml)
@@ -338,20 +421,21 @@ class MainActivity : AppCompatActivity() {
             reloadWebView()
             if (isChecked) {
                 // everytime clear any previously created retrofit when tunnel status changes.
-                ManualRetrofitApiClient.clearRetroFitInstance()
+                ParentAppRetrofitClient.clearRetroFitInstance()
                 ZscalerSDKRetrofit.clearInstance()
+                clearWebView()
                 registerZDKReceiver()
                 binding.tvZeroStatus.text = getString(R.string.status_format, "CONNECTING")
                 binding.tvPreStatus.visibility = View.INVISIBLE
 
                 val appKey = binding.zdkIdTextField.text.toString()
-                val accessToke = binding.accessTokenTextField.text.toString()
+                val accessToken = binding.accessTokenTextField.text.toString()
                 if (appKey.isBlank()) {
                     binding.zdkIdTextField.error = getString(R.string.zdk_id_is_empty)
                     binding.zeroTrustToggle.isChecked = false
                     binding.zeroTrustToggle.contentDescription = "OFF"
                     return@setOnCheckedChangeListener
-                } else if (accessToke.isBlank()) {
+                } else if (accessToken.isBlank()) {
                     binding.accessTokenTextField.error = getString(R.string.access_token_is_empty)
                     binding.zeroTrustToggle.isChecked = false
                     binding.zeroTrustToggle.contentDescription = "OFF"
@@ -363,13 +447,14 @@ class MainActivity : AppCompatActivity() {
                     mainViewModel.startZeroTrustTunnel(
                         appKey = appKey,
                         udid = mainViewModel.getUdid(getString(R.string.random_udid)),
-                        accessToken = accessToke,
+                        accessToken = accessToken,
                         onErrorOccurred = {
                             binding.zeroTrustToggle.isChecked = false
                             binding.zeroTrustToggle.contentDescription = "OFF"
                             binding.tvZeroStatus.visibility = View.VISIBLE
                             binding.tvZeroStatus.text =
                                 getString(R.string.error_status_format, it.toString())
+                            mainViewModel.zdkStatus.removeObservers(this)
                         })
                     binding.preLoginToggle.isEnabled = false
                     binding.zeroTrustToggle.contentDescription = "ON"
@@ -384,29 +469,37 @@ class MainActivity : AppCompatActivity() {
                     addMessageOnWebView(zpaEmptyHtml)
                 }
             } else {
-                unregisterReceiver(broadcastReceiver)
-                stopService(Intent(this, NotificationCancellationService::class.java))
-                notificationManager.cancel(NOTIFICATION_ID)
+                ProxyUtility.clearWebViewProxy()
+                clearWebView()
+                unregisterZDKReceiver()
                 mainViewModel.stopTunnel(resetStatusText = { getString(R.string.status_off) })
-                addMessageOnWebView(zpaNotConnectedHtml)
                 binding.zeroTrustToggle.contentDescription = "OFF"
                 binding.preLoginToggle.contentDescription = "OFF"
                 binding.preLoginToggle.isEnabled = true
                 mainViewModel.stopTunnelStatusUpdates()
                 binding.tvZeroStatus.text = getString(R.string.status_format, "OFF")
                 binding.tvZeroStatus.visibility = View.INVISIBLE
+                addMessageOnWebView(zpaNotConnectedHtml)
             }
         }
     }
 
     private fun reloadWebView() {
-        var url1: String = binding.webview.url.toString()
-        if (!(url1.isNullOrEmpty() || url1.equals("null"))) {
+        val webView : WebView = binding.frameLayout.getChildAt(0) as WebView
+        val url: String = webView.url.toString()
+        if (!(url.isEmpty() || url == "null")) {
             Toast.makeText(this, getString(R.string.reloading_web_page), Toast.LENGTH_SHORT).show()
-            binding.webview.loadUrl("about:blank")
-            binding.webview.clearCache(true) //required
-            binding.webview.loadUrl(url1)
+            webView.loadUrl("about:blank")
+            webView.clearCache(true) //required
+            webView.loadUrl(url)
         }
+    }
+
+    private fun clearWebView() {
+        val webView : WebView = binding.frameLayout.getChildAt(0) as WebView
+        Log.d(TAG, "Clearing Webview")
+        webView.clearCache(true)
+        webView.clearHistory()
     }
 
     private fun addLoggerFunction() {
@@ -444,9 +537,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createZipFileAndShare() {
-        val currentDateTime = SimpleDateFormat("yyyy-MM-dd-hh-mm-ss.SS").format(Date())
-        logFileName = "ZscalerSDK-$currentDateTime.zip"
-        ZipUtility.createEmptyZipFile(this, logFileName)
+        val currentTimeStamp = System.currentTimeMillis()
+        logsZipFileName = "ZscalerSDK_${currentTimeStamp/1000}.${currentTimeStamp%1000}.zip"
+        ZipUtility.createEmptyZipFile(this, logsZipFileName)
             ?.let {
                 launchShareIntentLogZip(it)
             }
@@ -456,7 +549,7 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, getString(R.string.saved_to_download), Toast.LENGTH_LONG).show()
         lifecycleScope.launch(Dispatchers.IO) {
             mainViewModel.exportLog(it)
-            val logZipFile = File(this@MainActivity.filesDir, logFileName)
+            val logZipFile = File(this@MainActivity.filesDir, logsZipFileName)
             val downloadFolder = this@MainActivity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
             if (downloadFolder != null) {
                 val stat = StatFs(downloadFolder.path)
@@ -472,8 +565,30 @@ class MainActivity : AppCompatActivity() {
                         val shareIntent = Intent(Intent.ACTION_SEND)
                         shareIntent.type = "application/zip"
                         shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri)
-                        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        startActivity(Intent.createChooser(shareIntent, getString(R.string.share_zdk_log_zip_file)))
+                        shareIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        val chooser = Intent.createChooser(
+                            shareIntent,
+                            getString(R.string.share_zdk_log_zip_file)
+                        )
+                        val resInfoList: List<ResolveInfo> =
+                            this@MainActivity.packageManager
+                                .queryIntentActivities(chooser, PackageManager.MATCH_DEFAULT_ONLY)
+
+                        if (resInfoList.isNotEmpty()) {
+                            for (resolveInfo in resInfoList) {
+                                val packageName = resolveInfo.activityInfo.packageName
+                                this@MainActivity.grantUriPermission(
+                                    packageName,
+                                    fileUri,
+                                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                )
+                            }
+                            startActivity(chooser)
+                        } else {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(this@MainActivity, getString(R.string.no_share_activity_present), Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
@@ -494,7 +609,7 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             saveLogToDownloadAboveAndEqualQ(context, logZipFile)
         } else {
-            saveLogToDownloadBelowQ(context, logFileName)
+            saveLogToDownloadBelowQ(context, logsZipFileName)
         }
     }
 
@@ -578,8 +693,6 @@ class MainActivity : AppCompatActivity() {
         val channel = NotificationChannel(NOTIFICATION_CHANNEL_ID, name, importance).apply {
             description = descriptionText
         }
-        val notificationManager: NotificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(channel)
     }
 

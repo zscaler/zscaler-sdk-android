@@ -8,22 +8,10 @@
         android:id="@+id/tv_Setting_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentTop="true"
-        android:textStyle="bold"
-        android:textColor="@color/black"
         android:text="@string/configuration_options"
-        android:textSize="@dimen/setting_text_size"  />
-
-    <TextView
-        android:id="@+id/tv_setting_done"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentEnd="true"
-        android:textColor="#64b5f6"
-        android:text="@string/save"
-        android:textSize="@dimen/setting_text_size" />
+        android:textColor="@color/black"
+        android:textSize="@dimen/setting_text_size"
+        android:textStyle="bold" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/settings_recycle_view"
@@ -31,5 +19,19 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/tv_Setting_title"
         android:layout_marginTop="@dimen/setting_list_margin_top" />
+
+    <TextView
+        android:id="@+id/tv_setting_done"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/settings_recycle_view"
+        android:layout_marginTop="@dimen/setting_text_margin_top"
+        android:layout_centerHorizontal="true"
+        android:text="@string/save"
+        android:textStyle="bold"
+        android:textColor="@color/black"
+        android:padding="@dimen/setting_padding_text"
+        android:background="@color/grey"
+        android:textSize="@dimen/setting_text_size" />
 
 </RelativeLayout>

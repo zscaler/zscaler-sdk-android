@@ -9,6 +9,7 @@
     <string name="config_zscaler">Zscaler Config</string>
     <string name="prelogin_tunnel">PreLogin Tunnel</string>
     <string name="zerotrust_tunnel">ZeroTrust Tunnel</string>
+    <string name="event_logs">Event Logs</string>
     <string name="status_format">Status: %1$s</string>
     <string name="error_status_format">Status: Error %1$s</string>
     <string name="enter_valid_zdk_id">Enter valid App Key</string>
@@ -22,6 +23,7 @@
     <string name="error_loading_data">Error loading data</string>
     <string name="saved_to_download">ZscalerSDK Log saved to download folder</string>
     <string name="not_enough_space">There is not enough disk space to export log files.</string>
+    <string name="no_share_activity_present">There is no activity which can handle exporting of logs.</string>
     <string name="download_folder_not_found">Download folder not found</string>
     <string name="configuration_options">Configuration Options</string>
     <string name="save">Save</string>

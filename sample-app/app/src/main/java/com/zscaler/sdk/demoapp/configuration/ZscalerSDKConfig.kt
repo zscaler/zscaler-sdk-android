@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.configuration
 
 import com.zscaler.sdk.android.configuration.ZscalerSDKConfiguration
 
@@ -6,7 +6,7 @@ enum class SettingType {
     URL_SESSIONS,
     WEB_VIEWS,
     PROXY_AUTHENTICATION,
-    BLOCK_JB_TRAFFIC,
+    BLOCK_ROOT_TRAFFIC,
     BLOCK_ZPA_CONNECTION,
     ENABLE_DEBUG_LOGS,
     LOG_LEVEL,
@@ -38,6 +38,10 @@ object ZscalerSDKSetting {
                 SettingType.PROXY_AUTHENTICATION,
                 false
             ),
+            failIfDeviceCompromised = zscalerSDKConfigurationMap.getOrDefault(
+                SettingType.BLOCK_ROOT_TRAFFIC,
+                false
+            ),
             blockZPAConnectionsOnTunnelFailure = zscalerSDKConfigurationMap.getOrDefault(
                 SettingType.BLOCK_ZPA_CONNECTION,
                 false
@@ -53,11 +57,13 @@ object ZscalerSDKSetting {
     fun defaultZscalerSDKConfiguration(): ZscalerSDKConfiguration {
         zscalerSDKConfigurationMap[SettingType.URL_SESSIONS] = true
         zscalerSDKConfigurationMap[SettingType.WEB_VIEWS] = true
+        zscalerSDKConfigurationMap[SettingType.BLOCK_ROOT_TRAFFIC] = true
         zscalerSDKConfigurationMap[SettingType.ENABLE_DEBUG_LOGS] = true
         logLevel = ZscalerSDKConfiguration.LogLevel.debug
         return ZscalerSDKConfiguration(
             automaticallyConfigureRequests = true,
             automaticallyConfigureWebviews = true,
+            failIfDeviceCompromised = true,
             enableDebugLogsInConsole = true,
             logLevel = ZscalerSDKConfiguration.LogLevel.debug
         )

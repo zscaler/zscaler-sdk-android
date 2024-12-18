@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:paddingTop="10dp"
     android:orientation="vertical"
-    tools:context=".MainActivity">
+    tools:context=".view.MainActivity">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -162,6 +162,7 @@
             android:layout_marginTop="24dp"
             android:layout_marginEnd="12dp"
             android:layout_below="@+id/ll_pre_login_parent"
+            android:layout_alignEnd="@+id/ll_zscaler_config"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -210,6 +211,32 @@
                 android:text="@string/config_zscaler" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/ll_event_logs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/event_logs_layout_margin"
+            android:layout_marginEnd="@dimen/event_logs_layout_margin"
+            android:layout_weight="@dimen/event_logs_layout_weight"
+            android:layout_below="@+id/ll_zscaler_config"
+            android:layout_alignParentEnd="true"
+            android:layout_marginTop="@dimen/event_logs_layout_margin"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="@dimen/iv_event_logs_width"
+                android:layout_height="@dimen/iv_event_logs_height"
+                android:layout_gravity="center"
+                android:contentDescription="@string/event_logs"
+                android:src="@drawable/ic_event_log" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="@string/event_logs" />
+        </LinearLayout>
+
     </RelativeLayout>
 
     <LinearLayout
@@ -250,8 +277,8 @@
 
     </LinearLayout>
 
-    <WebView
-        android:id="@+id/webview"
+    <FrameLayout
+        android:id="@+id/frameLayout"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />

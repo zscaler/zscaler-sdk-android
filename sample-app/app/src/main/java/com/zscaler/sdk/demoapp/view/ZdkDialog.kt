@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.view
 
 import android.content.Context
 import androidx.appcompat.app.AlertDialog

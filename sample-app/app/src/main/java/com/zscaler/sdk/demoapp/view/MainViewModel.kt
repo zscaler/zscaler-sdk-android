@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.view
 
 import android.app.Application
 import android.util.Log
@@ -9,7 +9,9 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.zscaler.sdk.android.ZscalerSDK
 import com.zscaler.sdk.android.exception.ZscalerSDKException
-import com.zscaler.sdk.android.networking.ZscalerSDKRetrofit
+import com.zscaler.sdk.demoapp.constants.ZDKTunnel
+import com.zscaler.sdk.demoapp.networking.ApiService
+import com.zscaler.sdk.demoapp.networking.ParentAppRetrofitClient
 import com.zscaler.sdk.demoapp.repository.SharedPrefsUserRepository
 import com.zscaler.sdk.demoapp.repository.UserRepository
 import kotlinx.coroutines.Dispatchers
@@ -122,11 +124,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopTunnel(resetStatusText:()-> String): Unit {
         Log.d(TAG, "stopTunnel() called")
-        try {
-            val retVal = ZscalerSDK.stopTunnel()
-            if (retVal == 0) zdkStatus.value = resetStatusText()
-        } catch (e: Exception) {
-            Log.e(TAG, "stopTunnel() failed with exception ${e.message}")
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val retVal = ZscalerSDK.stopTunnel()
+                withContext(Dispatchers.Main) {
+                    if (retVal == 0) {
+                        zdkStatus.value = resetStatusText()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "stopTunnel() failed with exception ${e.message}")
+            }
         }
     }
 
@@ -164,13 +172,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun getData(url: String) {
-        Log.d(TAG, "getData() called with: url = $url")
-        val apiService = ZscalerSDKRetrofit.getInstance(url).create(ApiService::class.java)
+    fun loadWithAutomaticConfig(url: String) {
+        Log.d(TAG, "loadWithAutomaticConfig() called with: url = $url")
+        val apiService = ParentAppRetrofitClient.getRetrofitClient(url)?.create(ApiService::class.java)
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val response = apiService.getData(url).execute()
-                parseRetrofitResponse(response)
+                val response = apiService?.getData(url)?.execute()
+                if (response != null) {
+                    parseRetrofitResponse(response)
+                }
             } catch (e: IOException) {
                 _responseData.postValue("Network error")
                 e.printStackTrace()
@@ -178,11 +188,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadManuallyWithProxyInfo(url: String, method: Boolean) {
-        val proxyInfo = ZscalerSDK.proxyInfo()
-        val apiService = proxyInfo?.let {
-            ManualRetrofitApiClient.getRetrofitWithProxyInfo(baseUrl = url, it)?.create(ApiService::class.java)
-        }
+    fun loadWithSemiAutomaticConfig(url: String, method: Boolean) {
+        Log.d(TAG, "loadWithSemiAutomaticConfig() called with: url = $url")
+        val apiService = ZscalerSDK.setUpClient(null, url)?.create(ApiService::class.java)
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val response = if(method) {
@@ -190,7 +198,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     apiService?.postData(url)?.execute()
                 }
-                response?.let { parseRetrofitResponse(it) }
+                if (response != null) {
+                    parseRetrofitResponse(response)
+                }
             } catch (e: IOException) {
                 _responseData.postValue("Network error")
                 e.printStackTrace()
@@ -198,13 +208,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun postData(url: String, params: Map<String, String>) {
+    fun loadPostDataWithAutomaticConfig(url: String, params: Map<String, String>) {
         Log.d(TAG, "postData() called with: url = $url, params = $params")
-        val apiService = ZscalerSDKRetrofit.getInstance(url).create(ApiService::class.java)
+        val apiService = ParentAppRetrofitClient.getRetrofitClient(url)?.create(ApiService::class.java)
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val response = apiService.postData(url, params).execute()
-                parseRetrofitResponse(response)
+                val response = apiService?.postData(url, params)?.execute()
+                if (response != null) {
+                    parseRetrofitResponse(response)
+                }
             } catch (e: IOException) {
                 _responseData.postValue("Network error")
                 e.printStackTrace()

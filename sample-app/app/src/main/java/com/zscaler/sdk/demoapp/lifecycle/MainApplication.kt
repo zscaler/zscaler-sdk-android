@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.lifecycle
 
 import android.app.Application
 import androidx.lifecycle.ProcessLifecycleOwner

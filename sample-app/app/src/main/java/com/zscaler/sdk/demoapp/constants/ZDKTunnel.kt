@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.constants
 
 enum class ZDKTunnel {
     PRE_LOGIN,

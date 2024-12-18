@@ -1,4 +1,4 @@
-package com.zscaler.sdk.demoapp
+package com.zscaler.sdk.demoapp.constants
 
 const val NOTIFICATION_CHANNEL_ID = "ZSCALERSDK_NOTIFICATION_ID"
 const val NOTIFICATION_ID = 1

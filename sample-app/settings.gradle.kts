@@ -13,7 +13,11 @@ dependencyResolutionManagement {
         maven {
             name = "ZdkAndroid"
             url = uri("https://maven.pkg.github.com/zscaler/zscaler-sdk-android")
-        }
+            credentials {
+                username = settings.extra.get("gpr.user") as String? ?: System.getenv("GITHUB_USERNAME")
+                password = settings.extra.get("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
+            }
+	    }
     }
 }
 

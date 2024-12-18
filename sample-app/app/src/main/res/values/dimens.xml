@@ -2,9 +2,16 @@
 <resources>
     <dimen name="setting_text_size">16sp</dimen>
     <dimen name="setting_padding_parent">16dp</dimen>
+    <dimen name="setting_padding_text">8dp</dimen>
+    <dimen name="setting_text_margin_top">32dp</dimen>
     <dimen name="setting_list_margin_top">8dp</dimen>
     <dimen name="rg_log_level_option_mrgin_top">10dp</dimen>
     <dimen name="ll_parent_setting_radio_padding_start">10dp</dimen>
     <dimen name="ll_parent_setting_radio_padding_top">16dp</dimen>
     <dimen name="spinner_layout_width">60dp</dimen>
+    <dimen name="event_log_view_padding">16dp</dimen>
+    <dimen name="iv_event_logs_width">32dp</dimen>
+    <dimen name="iv_event_logs_height">32dp</dimen>
+    <dimen name="event_logs_layout_margin">12dp</dimen>
+    <dimen name="event_logs_layout_weight">2</dimen>
 </resources>
