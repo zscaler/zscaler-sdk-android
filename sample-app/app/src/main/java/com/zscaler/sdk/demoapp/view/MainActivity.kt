@@ -12,7 +12,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
-import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -21,14 +20,15 @@ import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.view.View
-import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.AdapterView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import androidx.core.text.HtmlCompat
@@ -44,21 +44,23 @@ import com.zscaler.sdk.android.configuration.ZscalerSDKConfiguration
 import com.zscaler.sdk.android.exception.ZscalerSDKException
 import com.zscaler.sdk.android.networking.ZscalerSDKRetrofit
 import com.zscaler.sdk.android.notification.ZscalerSDKNotificationEnum
+import com.zscaler.sdk.android.tunnelstatus.ZscalerSDKTunnelStatus
+import com.zscaler.sdk.android.tunnelstatus.ZscalerSDKTunnelType
 import com.zscaler.sdk.demoapp.BuildConfig
 import com.zscaler.sdk.demoapp.R
-import com.zscaler.sdk.demoapp.util.ProxyUtility
 import com.zscaler.sdk.demoapp.configuration.ConfigActivity
 import com.zscaler.sdk.demoapp.configuration.ZscalerSDKSetting
 import com.zscaler.sdk.demoapp.constants.NOTIFICATION_CHANNEL_ID
 import com.zscaler.sdk.demoapp.constants.NOTIFICATION_ID
+import com.zscaler.sdk.demoapp.constants.RequestMethod
 import com.zscaler.sdk.demoapp.constants.ZDKTunnel
 import com.zscaler.sdk.demoapp.constants.zpaEmptyHtml
-import com.zscaler.sdk.demoapp.constants.zpaErrorHtml
 import com.zscaler.sdk.demoapp.constants.zpaNotConnectedHtml
 import com.zscaler.sdk.demoapp.databinding.ActivityMainBinding
-import com.zscaler.sdk.demoapp.constants.RequestMethod
 import com.zscaler.sdk.demoapp.networking.ParentAppRetrofitClient
 import com.zscaler.sdk.demoapp.service.NotificationCancellationService
+import com.zscaler.sdk.demoapp.util.ProxyUtility
+import com.zscaler.sdk.demoapp.util.WebViewClientWithProxyAuthSupport
 import com.zscaler.sdk.demoapp.util.ZipUtility
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -76,7 +78,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var logsZipFileName: String
     private lateinit var mainViewModel: MainViewModel
     private var isRetrofitClientNeeded: Boolean = false
-    private lateinit var webView: WebView
     private var requestMethod: RequestMethod = RequestMethod.WEB
     private lateinit var broadcastReceiver: BroadcastReceiver
     private lateinit var notificationManager: NotificationManager
@@ -100,7 +101,6 @@ class MainActivity : AppCompatActivity() {
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         setContentView(binding.root)
         sdkConfiguration = ZscalerSDKSetting.getZscalerSDKConfiguration()
-        configureWebView()
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -117,15 +117,13 @@ class MainActivity : AppCompatActivity() {
         addEventLogsToUi()
     }
 
-    override fun onResume() {
-        if (sdkConfiguration.automaticallyConfigureWebviews !=
-            ZscalerSDKSetting.getZscalerSDKConfiguration().automaticallyConfigureWebviews) {
-            sdkConfiguration = ZscalerSDKSetting.getZscalerSDKConfiguration()
-            configureWebView()
-        } else {
-            sdkConfiguration = ZscalerSDKSetting.getZscalerSDKConfiguration()
+    override fun onStart() {
+        sdkConfiguration = ZscalerSDKSetting.getZscalerSDKConfiguration()
+        // check and apply manual web-view setting if coming from config screen, when tunnel is on
+        if (ZscalerSDK.status().tunnelConnectionState == "ON") {
+            applyWebViewProxySettings()
         }
-        super.onResume()
+        super.onStart()
     }
 
     private fun initZdkConfiguration() {
@@ -134,22 +132,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun addEventLogsToUi() {
         binding.llEventLogs.setOnClickListener { startActivity(Intent(this@MainActivity, EventLogViewActivity::class.java)) }
-    }
-
-    private fun configureWebView() {
-        if (binding.frameLayout.getChildAt(0) != null) {
-            binding.frameLayout.removeViewAt(0)
-        }
-        if (sdkConfiguration.automaticallyConfigureWebviews) {
-            binding.frameLayout.addView(WebView(this))
-        } else {
-            val zscalerSDKWebView = ZscalerSDK.setUpWebView()
-            if (zscalerSDKWebView != null) {
-                binding.frameLayout.addView(zscalerSDKWebView)
-            } else {
-                binding.frameLayout.addView(WebView(this))
-            }
-        }
     }
 
     /**
@@ -180,12 +162,11 @@ class MainActivity : AppCompatActivity() {
                 val notificationMessage = intent?.getStringExtra(ZscalerSDK.NOTIFICATION_MESSAGE)
                 Log.d(TAG, "onReceive() called with: notificationCode = $notificationCode, notificationMessage = $notificationMessage")
                 notificationCode?.takeIf() {it > -1
-                    if (notificationCode == ZscalerSDKNotificationEnum.ZDK_TUNNEL_READY_TO_USE.ordinal ||
-                        notificationCode == ZscalerSDKNotificationEnum.ZDK_TUNNEL_DISCONNECTED.ordinal) {
+                    if (notificationCode == ZscalerSDKNotificationEnum.ZSCALERSDK_TUNNEL_CONNECTED.ordinal ||
+                        notificationCode == ZscalerSDKNotificationEnum.ZSCALERSDK_TUNNEL_DISCONNECTED.ordinal) {
                         ParentAppRetrofitClient.clearRetroFitInstance()
-                        clearWebView()
                     }
-                    if (notificationCode == ZscalerSDKNotificationEnum.ZDK_TUNNEL_DISCONNECTED.ordinal) {
+                    if (notificationCode == ZscalerSDKNotificationEnum.ZSCALERSDK_TUNNEL_DISCONNECTED.ordinal) {
                         unregisterZDKReceiver()
                     }
                     createNotification(ZscalerSDKNotificationEnum.values()[notificationCode].message, ZscalerSDKNotificationEnum.values()[notificationCode].message)
@@ -230,15 +211,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy() called")
-        if (mainViewModel.getSelectedTunnel() == ZDKTunnel.PRE_LOGIN) {
+        if (mainViewModel.getSelectedTunnel() == ZDKTunnel.PRELOGIN) {
             mainViewModel.stopTunnel(resetStatusText = { getString(R.string.status_off) })
-        } else if (mainViewModel.getSelectedTunnel() == ZDKTunnel.ZERO_TRUST) {
+        } else if (mainViewModel.getSelectedTunnel() == ZDKTunnel.ZEROTRUST) {
             mainViewModel.stopTunnel(resetStatusText = { getString(R.string.status_off) })
         }
-        if (sdkConfiguration.automaticallyConfigureRequests) {
-            ParentAppRetrofitClient.clearRetroFitInstance()
-        }
-        clearWebView()
+        ParentAppRetrofitClient.clearRetroFitInstance()
         try {
             unregisterZDKReceiver()
         } catch (e: RuntimeException) {
@@ -249,8 +227,8 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun enableBrowsing() {
-        val webView = binding.frameLayout.getChildAt(0) as WebView
-        webView.settings.javaScriptEnabled = true
+        binding.webview.settings.javaScriptEnabled = true
+        binding.webview.webViewClient = DefaultWebViewClient()
         addMessageOnWebView(zpaNotConnectedHtml)
         binding.goButton.setOnClickListener {
             var url = binding.browserUrlTextField.text.toString()
@@ -262,32 +240,19 @@ class MainActivity : AppCompatActivity() {
                 url = addHttpsIfNeeded(url)
                 when (requestMethod) {
                     RequestMethod.GET ->
-                            if (sdkConfiguration.automaticallyConfigureRequests) {
-                                mainViewModel.loadWithAutomaticConfig(url = url.ensureEndsWithSlash())
-                            } else {
-                                mainViewModel.loadWithSemiAutomaticConfig(url.ensureEndsWithSlash(), true)
-                            }
+                        mainViewModel.loadWithSemiAutomaticConfig(url.ensureEndsWithSlash(), true)
                     RequestMethod.POST ->
-                        if (sdkConfiguration.automaticallyConfigureRequests) {
-                            mainViewModel.loadPostDataWithAutomaticConfig(url = url.ensureEndsWithSlash(), params = emptyMap())
-                        } else {
-                            mainViewModel.loadWithSemiAutomaticConfig(url.ensureEndsWithSlash(), false)
-                        }
+                        mainViewModel.loadWithSemiAutomaticConfig(url.ensureEndsWithSlash(), false)
                     RequestMethod.WEB ->
-                        if (sdkConfiguration.automaticallyConfigureWebviews) {
-                            loadInWebViewWithAutomaticConfig(url = url)
-                        } else {
-                            loadInWebViewWithSemiAutomaticConfig(url)
-                        }
+                        loadURLInWebView(url)
                 }
             }
         }
         mainViewModel.responseData.observe(this) { responseData ->
-            val webView = binding.frameLayout.getChildAt(0) as WebView
-            webView.loadUrl("about:blank")
-            webView.clearCache(true)
+            binding.webview.loadUrl("about:blank")
+            binding.webview.clearCache(true)
             if (requestMethod != RequestMethod.WEB) {
-                webView.visibility = View.GONE
+                binding.webview.visibility = View.GONE
                 binding.tvResponse.visibility = View.VISIBLE
                 if (responseData != null) {
                     if (responseData.toString()
@@ -307,10 +272,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadInWebViewWithAutomaticConfig(url: String) {
+    private fun loadURLInWebView(url: String) {
         binding.tvResponse.visibility = View.GONE
-        val webView = binding.frameLayout.getChildAt(0) as WebView
-        webView.visibility = View.VISIBLE
+        binding.webview.visibility = View.VISIBLE
         var formattedUrl = url.trim()
         if (!formattedUrl.startsWith("http://")
             && !formattedUrl.startsWith("https://")
@@ -318,52 +282,31 @@ class MainActivity : AppCompatActivity() {
         ) {
             formattedUrl = "https://$formattedUrl"
         }
-        webView.clearCache(true)
-        webView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                super.onPageStarted(view, url, favicon)
-                webView.contentDescription = "Page is loading..."
-            }
 
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                webView.contentDescription = "Page loaded successfully"
-            }
-            override fun onReceivedError(
-                view: WebView?,
-                request: WebResourceRequest?,
-                error: WebResourceError?
-            ) {
-                super.onReceivedError(view, request, error)
-                addMessageOnWebView(zpaErrorHtml)
-                webView.contentDescription = "Failed to load the page"
-            }
-        }
-        webView.loadUrl(formattedUrl)
-    }
+        // Clear caches for testing purpose before loading a url
+        val webSettings: WebSettings = binding.webview.settings
+        webSettings.cacheMode = WebSettings.LOAD_NO_CACHE
+        webSettings.domStorageEnabled = false
+        binding.webview.clearCache(true)
 
-    private fun loadInWebViewWithSemiAutomaticConfig(url: String) {
-       val zscalerSDKWebView = ZscalerSDK.setUpWebView()
-       zscalerSDKWebView?.loadUrl(url)
+        binding.webview.loadUrl(formattedUrl)
     }
 
     private fun addMessageOnWebView(htmlText: String) {
         if (mainViewModel.getSelectedTunnel() == ZDKTunnel.NO_SELECTION) {
             val encodedHtml = Base64.encodeToString(htmlText.toByteArray(), Base64.NO_PADDING)
-            val webView = binding.frameLayout.getChildAt(0) as WebView
-            webView.loadData(encodedHtml, "text/html", "base64")
+            binding.webview.loadData(encodedHtml, "text/html", "base64")
         }
     }
 
     @SuppressLint("SetTextI18n")
     private fun configureTunnelToggleButtons() {
-        binding.preLoginToggle.setOnCheckedChangeListener { buttonView, isChecked ->
-            reloadWebView()
-            if (isChecked) {
+        binding.preLoginToggle.setOnClickListener { buttonView->
+            val toggleButton = buttonView as SwitchCompat
+            if (toggleButton.isChecked) {
                 // everytime clear any previously manually created retrofit when tunnel status changes.
                 ParentAppRetrofitClient.clearRetroFitInstance()
                 ZscalerSDKRetrofit.clearInstance()
-                clearWebView()
                 registerZDKReceiver()
                 binding.tvPreStatus.text = getString(R.string.status_format, "CONNECTING")
 
@@ -374,42 +317,42 @@ class MainActivity : AppCompatActivity() {
                     binding.zdkIdTextField.error = getString(R.string.zdk_id_is_empty)
                     binding.preLoginToggle.isChecked = false
                     binding.preLoginToggle.contentDescription = "OFF"
-                    return@setOnCheckedChangeListener
+                    return@setOnClickListener
 
                 } else {
                     binding.tvPreStatus.visibility = View.VISIBLE
                     binding.zdkIdTextField.error = null
+                    binding.zeroTrustToggle.isChecked = false
+                    binding.preLoginToggle.isChecked = true
                     mainViewModel.startPreLoginTunnel(appKey = appKey,
                         udid = mainViewModel.getUdid(getString(R.string.random_udid)),
                         onErrorOccurred = {
+                            clearWebViewProxySettings()
                             binding.preLoginToggle.isChecked = false
                             binding.preLoginToggle.contentDescription = "OFF"
                             binding.tvPreStatus.visibility = View.VISIBLE
                             binding.tvPreStatus.text =
                                 getString(R.string.error_status_format, it.toString())
-                            mainViewModel.zdkStatus.removeObservers(this)
-                            binding.zeroTrustToggle.isEnabled = true
+                            mainViewModel.zdkTunnelConnectionStateLiveData.removeObservers(this)
                         })
-                    binding.zeroTrustToggle.isEnabled = false
+                    applyWebViewProxySettings()
                     binding.preLoginToggle.contentDescription = "ON"
                     binding.zeroTrustToggle.contentDescription = "OFF"
                     mainViewModel.startTunnelStatusUpdates()
                     binding.tvPreStatus.text =
                         getString(R.string.status_format, mainViewModel.getStatus())
                     binding.tvZeroStatus.text = getString(R.string.status_format, "OFF")
-                    mainViewModel.zdkStatus.observe(this) {
+                    mainViewModel.zdkTunnelConnectionStateLiveData.observe(this) {
                         binding.tvPreStatus.text = getString(R.string.status_format, it)
                     }
                     addMessageOnWebView(zpaEmptyHtml)
                 }
             } else {
-                ProxyUtility.clearWebViewProxy()
-                clearWebView()
+                clearWebViewProxySettings()
                 unregisterZDKReceiver()
                 mainViewModel.stopTunnel(resetStatusText = { getString(R.string.status_off) })
                 binding.preLoginToggle.contentDescription = "OFF"
                 binding.zeroTrustToggle.contentDescription = "OFF"
-                binding.zeroTrustToggle.isEnabled = true
                 mainViewModel.stopTunnelStatusUpdates()
                 binding.tvPreStatus.text = getString(R.string.status_format, "OFF")
                 binding.tvPreStatus.visibility = View.INVISIBLE
@@ -417,13 +360,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.zeroTrustToggle.setOnCheckedChangeListener { buttonView, isChecked ->
-            reloadWebView()
-            if (isChecked) {
+        binding.zeroTrustToggle.setOnClickListener { buttonView->
+            val toggleButton = buttonView as SwitchCompat
+            if (toggleButton.isChecked) {
                 // everytime clear any previously created retrofit when tunnel status changes.
                 ParentAppRetrofitClient.clearRetroFitInstance()
                 ZscalerSDKRetrofit.clearInstance()
-                clearWebView()
                 registerZDKReceiver()
                 binding.tvZeroStatus.text = getString(R.string.status_format, "CONNECTING")
                 binding.tvPreStatus.visibility = View.INVISIBLE
@@ -434,12 +376,12 @@ class MainActivity : AppCompatActivity() {
                     binding.zdkIdTextField.error = getString(R.string.zdk_id_is_empty)
                     binding.zeroTrustToggle.isChecked = false
                     binding.zeroTrustToggle.contentDescription = "OFF"
-                    return@setOnCheckedChangeListener
+                    return@setOnClickListener
                 } else if (accessToken.isBlank()) {
                     binding.accessTokenTextField.error = getString(R.string.access_token_is_empty)
                     binding.zeroTrustToggle.isChecked = false
                     binding.zeroTrustToggle.contentDescription = "OFF"
-                    return@setOnCheckedChangeListener
+                    return@setOnClickListener
                 } else {
                     binding.tvZeroStatus.visibility = View.VISIBLE
                     binding.zdkIdTextField.error = null
@@ -454,28 +396,49 @@ class MainActivity : AppCompatActivity() {
                             binding.tvZeroStatus.visibility = View.VISIBLE
                             binding.tvZeroStatus.text =
                                 getString(R.string.error_status_format, it.toString())
-                            mainViewModel.zdkStatus.removeObservers(this)
+                            mainViewModel.zdkTunnelConnectionStateLiveData.removeObservers(this)
+                            val zscalerSDKTunnelStatus = ZscalerSDK.status()
+                            val isPreLoginTunnelStillActive = (zscalerSDKTunnelStatus.tunnelType == ZscalerSDKTunnelType.PRELOGIN && zscalerSDKTunnelStatus.tunnelConnectionState == "ON")
+                            if (it == ZscalerSDKException.ErrorCode.TUNNEL_UPGRADE_FAILED || isPreLoginTunnelStillActive) {
+                                // special case - tunnel upgrade failed
+                                // i.e. tunnel upgrade from PLT to ZTT failed but PLT is still running
+                                mainViewModel.setSelectedTunnel(ZDKTunnel.PRELOGIN)
+                                mainViewModel.startTunnelStatusUpdates()
+                                binding.tvPreStatus.visibility = View.VISIBLE
+                                mainViewModel.zdkTunnelConnectionStateLiveData.observe(this) {
+                                    binding.tvPreStatus.text = getString(R.string.status_format, it)
+                                }
+                                binding.preLoginToggle.isChecked = true
+                                binding.preLoginToggle.contentDescription = "ON"
+
+                                binding.tvZeroStatus.visibility = View.VISIBLE
+                                binding.tvZeroStatus.text =
+                                    getString(R.string.error_status_format, it.toString())
+
+                            } else {
+                                clearWebViewProxySettings()
+                            }
                         })
-                    binding.preLoginToggle.isEnabled = false
+                    applyWebViewProxySettings()
                     binding.zeroTrustToggle.contentDescription = "ON"
+                    binding.preLoginToggle.isChecked = false
                     binding.preLoginToggle.contentDescription = "OFF"
                     mainViewModel.startTunnelStatusUpdates()
                     binding.tvZeroStatus.text =
                         getString(R.string.status_format, mainViewModel.getStatus())
                     binding.tvPreStatus.text = getString(R.string.status_format, "OFF")
-                    mainViewModel.zdkStatus.observe(this) {
+                    mainViewModel.zdkTunnelConnectionStateLiveData.observe(this) {
                         binding.tvZeroStatus.text = getString(R.string.status_format, it)
                     }
                     addMessageOnWebView(zpaEmptyHtml)
                 }
             } else {
-                ProxyUtility.clearWebViewProxy()
-                clearWebView()
+                clearWebViewProxySettings()
                 unregisterZDKReceiver()
                 mainViewModel.stopTunnel(resetStatusText = { getString(R.string.status_off) })
                 binding.zeroTrustToggle.contentDescription = "OFF"
                 binding.preLoginToggle.contentDescription = "OFF"
-                binding.preLoginToggle.isEnabled = true
+                binding.preLoginToggle.isChecked = false
                 mainViewModel.stopTunnelStatusUpdates()
                 binding.tvZeroStatus.text = getString(R.string.status_format, "OFF")
                 binding.tvZeroStatus.visibility = View.INVISIBLE
@@ -484,22 +447,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun reloadWebView() {
-        val webView : WebView = binding.frameLayout.getChildAt(0) as WebView
-        val url: String = webView.url.toString()
-        if (!(url.isEmpty() || url == "null")) {
-            Toast.makeText(this, getString(R.string.reloading_web_page), Toast.LENGTH_SHORT).show()
-            webView.loadUrl("about:blank")
-            webView.clearCache(true) //required
-            webView.loadUrl(url)
+    private fun applyWebViewProxySettings() {
+        ZscalerSDK.proxyInfo()?.let { proxyInfo ->
+            ProxyUtility.setWebViewProxy(proxyInfo)
+            if (sdkConfiguration.useProxyAuthentication) {
+                Log.d(TAG, "applyWebViewProxySettings: using WebViewClientWithProxyAuthSupport")
+                // only change web view client if previous is not the same which we want
+                if (binding.webview.webViewClient !is WebViewClientWithProxyAuthSupport) {
+                    binding.webview.webViewClient = WebViewClientWithProxyAuthSupport(proxyInfo)
+                }
+            } else {
+                Log.d(TAG, "applyWebViewProxySettings: using Default WebViewClient")
+                // only change web view client if previous is not the same which we want
+                if (binding.webview.webViewClient is WebViewClientWithProxyAuthSupport) {
+                    binding.webview.webViewClient = DefaultWebViewClient()
+                }
+            }
         }
     }
 
-    private fun clearWebView() {
-        val webView : WebView = binding.frameLayout.getChildAt(0) as WebView
-        Log.d(TAG, "Clearing Webview")
-        webView.clearCache(true)
-        webView.clearHistory()
+    private fun clearWebViewProxySettings() {
+        ProxyUtility.clearWebViewProxy()
+        Log.d(TAG, "clearWebViewProxySettings: using Default WebViewClient")
+        if (binding.webview.webViewClient is WebViewClientWithProxyAuthSupport) {
+            binding.webview.webViewClient = DefaultWebViewClient()
+        }
     }
 
     private fun addLoggerFunction() {
@@ -706,8 +678,8 @@ class MainActivity : AppCompatActivity() {
             .setOnlyAlertOnce(true)
             .setContentIntent(pendingIntentForActivity())
 
-        startForegroundService(Intent(this, NotificationCancellationService::class.java))
         notificationManager.notify(NOTIFICATION_ID, builder.build())
+        startForegroundService(Intent(this, NotificationCancellationService::class.java))
         return true
     }
 
@@ -720,4 +692,13 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(this, MainActivity::class.java)
         return PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
     }
+}
+
+open class DefaultWebViewClient() : WebViewClient() {
+
+    // override to block redirection to chrome or default browser i.e. url should open in web-view only
+    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+        return false
+    }
+
 }

@@ -1,7 +1,7 @@
 package com.zscaler.sdk.demoapp.constants
 
 enum class ZDKTunnel {
-    PRE_LOGIN,
-    ZERO_TRUST,
+    PRELOGIN,
+    ZEROTRUST,
     NO_SELECTION
 }

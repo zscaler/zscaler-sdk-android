@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import com.zscaler.sdk.demoapp.constants.NOTIFICATION_ID
 
 
@@ -15,6 +16,8 @@ import com.zscaler.sdk.demoapp.constants.NOTIFICATION_ID
  */
 class NotificationCancellationService : Service() {
 
+    private val TAG = "NotificationCancellationService"
+
     private fun showNotification() {
         val notificationManager = (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
         val existingNotification = notificationManager.activeNotifications.find {
@@ -22,6 +25,7 @@ class NotificationCancellationService : Service() {
         }?.notification
 
         if (existingNotification != null) {
+            Log.d(TAG, "showNotification() called with existingNotification : not null, show notification")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(
                     NOTIFICATION_ID,
@@ -31,6 +35,10 @@ class NotificationCancellationService : Service() {
             } else {
                 startForeground(NOTIFICATION_ID, existingNotification)
             }
+        } else {
+            Log.d(TAG, "showNotification() called with existingNotification : null, do cleanup")
+            notificationManager.cancelAll()
+            stopSelf()
         }
     }
 

@@ -13,20 +13,32 @@ plugins {
     id("com.github.triplet.play") version "3.9.1" // for publishing test app bundle to play
 }
 
-var versionNameVal = "x.x-dev"
+val versionFile = File(rootProject.projectDir.parentFile.parentFile.parentFile, "VERSION.txt")
+val versionText = versionFile.readText().trim()
+val versionRegex = Regex("^(\\d+\\.\\d+\\.\\d+)$")
+val matchResult = versionRegex.find(versionText)
+var baseVersion = matchResult?.groupValues?.get(1) ?: "2.0.0"
 var versionCodeVal = 1
+if(project.hasProperty("buildBaseVersion")) {
+    baseVersion = project.findProperty("buildBaseVersion").toString()
+    println("baseVersion $baseVersion")
+}
+var finalVersion = baseVersion
+rootProject.version =  baseVersion
 
-if (project.hasProperty("buildVersionName")) {
-    versionNameVal = project.ext.get("buildVersionName").toString()
-    rootProject.version =  versionNameVal
-    // calculate version code from version name
-    val parts = versionNameVal.split("-")[0].split(".") // handles SNAPSHOT also
-    val versionCodeInt = parts[0].toInt() * 10000 + parts[1].toInt() * 100 + (parts.getOrNull(2)?.toInt() ?: 0) // handles 0...99 for each major,minor,patch/build
-    if (versionCodeInt > versionCodeVal) {
-        versionCodeVal = versionCodeInt
-    }
-    println("versionNameVal " + versionNameVal)
-    println("versionCodeVal " + versionCodeVal)
+//Add the buildNumber to test app to fetch the right build from nexus
+var buildNumber = ""
+if(project.hasProperty("buildNumber")) {
+    buildNumber = project.findProperty("buildNumber").toString()
+    println("buildNumber $buildNumber")
+    finalVersion = "$finalVersion.$buildNumber"
+}
+
+// calculate version code from final version name
+val parts = finalVersion.split("-")[0].split(".") // handles SNAPSHOT also
+val versionCodeInt = parts[0].toInt() * 10000 + parts[1].toInt() * 100 + (parts.getOrNull(2)?.toInt() ?: 0) // handles 0...99 for each major,minor,patch/build
+if (versionCodeInt > versionCodeVal) {
+    versionCodeVal = versionCodeInt
 }
 
 android {
@@ -38,7 +50,7 @@ android {
         minSdk = 28
         targetSdk = 35
         versionCode = versionCodeVal
-        versionName = versionNameVal
+        versionName = finalVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -127,7 +139,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = (System.getenv("ARTIFACT_GROUP_ID") ?: "com.zscaler.sdk") + ".zscalersdk-android"
             artifactId = "testapp"
-            version = versionNameVal
+            version = finalVersion
             pom {
                 packaging = "apk"
             }
@@ -153,9 +165,9 @@ dependencies {
     implementation("androidx.webkit:webkit:1.9.0")
 
     // retrofit
-    implementation ("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-
+    implementation("com.android.volley:volley:1.2.1")
     // zdk dependency
     implementation("com.zscaler.sdk:zscalersdk-android:latest.release")
 

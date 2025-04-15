@@ -55,14 +55,14 @@ object ZscalerSDKSetting {
     }
 
     fun defaultZscalerSDKConfiguration(): ZscalerSDKConfiguration {
-        zscalerSDKConfigurationMap[SettingType.URL_SESSIONS] = true
-        zscalerSDKConfigurationMap[SettingType.WEB_VIEWS] = true
+        zscalerSDKConfigurationMap[SettingType.URL_SESSIONS] = false
+        zscalerSDKConfigurationMap[SettingType.WEB_VIEWS] = false
         zscalerSDKConfigurationMap[SettingType.BLOCK_ROOT_TRAFFIC] = true
         zscalerSDKConfigurationMap[SettingType.ENABLE_DEBUG_LOGS] = true
         logLevel = ZscalerSDKConfiguration.LogLevel.debug
         return ZscalerSDKConfiguration(
-            automaticallyConfigureRequests = true,
-            automaticallyConfigureWebviews = true,
+            automaticallyConfigureRequests = false,
+            automaticallyConfigureWebviews = false,
             failIfDeviceCompromised = true,
             enableDebugLogsInConsole = true,
             logLevel = ZscalerSDKConfiguration.LogLevel.debug

@@ -1,6 +1,7 @@
 package com.zscaler.sdk.demoapp.view
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
@@ -9,9 +10,11 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.zscaler.sdk.android.ZscalerSDK
 import com.zscaler.sdk.android.exception.ZscalerSDKException
+import com.zscaler.sdk.android.tunnelstatus.ZscalerSDKTunnelStatus
 import com.zscaler.sdk.demoapp.constants.ZDKTunnel
 import com.zscaler.sdk.demoapp.networking.ApiService
 import com.zscaler.sdk.demoapp.networking.ParentAppRetrofitClient
+import com.zscaler.sdk.demoapp.networking.VolleyClient
 import com.zscaler.sdk.demoapp.repository.SharedPrefsUserRepository
 import com.zscaler.sdk.demoapp.repository.UserRepository
 import kotlinx.coroutines.Dispatchers
@@ -23,14 +26,14 @@ import okhttp3.ResponseBody
 import retrofit2.Response
 import java.io.BufferedInputStream
 import java.io.IOException
-import java.util.Base64
 import java.util.UUID
+
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val TAG = "MainViewModel"
     var tunnelOption = mutableStateOf(ZDKTunnel.NO_SELECTION)
-    var tunnelStatus = mutableStateOf("")
-    var zdkStatus: MutableLiveData<String> = MutableLiveData()
+    var tunnelConnectionState = mutableStateOf("")
+    var zdkTunnelConnectionStateLiveData: MutableLiveData<String> = MutableLiveData()
     private lateinit var zdkStatusLaunch: Job
     private val userRepository: UserRepository = SharedPrefsUserRepository(application)
     private val _responseData = MutableLiveData<String>()
@@ -75,8 +78,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 ZscalerSDK.startPreLoginTunnel(appKey = appKey, deviceUdid = udid)
-                tunnelStatus.value = ZscalerSDK.status()
-                setSelectedTunnel(ZDKTunnel.PRE_LOGIN)
+                tunnelConnectionState.value = ZscalerSDK.status().tunnelConnectionState
+                setSelectedTunnel(ZDKTunnel.PRELOGIN)
                 Log.d(TAG, "startPreLoginTunnel completed")
             } catch (e: Exception) {
                 Log.e(TAG, "startPreLoginTunnel() failed with exception :: ${e.message}")
@@ -103,8 +106,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 ZscalerSDK.startZeroTrustTunnel(appKey = appKey, deviceUdid = udid, accessToken = accessToken)
-                tunnelStatus.value = ZscalerSDK.status()
-                setSelectedTunnel(ZDKTunnel.ZERO_TRUST)
+                tunnelConnectionState.value = ZscalerSDK.status().tunnelConnectionState
+                setSelectedTunnel(ZDKTunnel.ZEROTRUST)
                 Log.d(TAG, "startZeroTrustTunnel completed")
             } catch (e: Exception) {
             Log.e(TAG, "startZeroTrustTunnel() failed with exception ${e.message}")
@@ -129,7 +132,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val retVal = ZscalerSDK.stopTunnel()
                 withContext(Dispatchers.Main) {
                     if (retVal == 0) {
-                        zdkStatus.value = resetStatusText()
+                        zdkTunnelConnectionStateLiveData.value = resetStatusText()
                     }
                 }
             } catch (e: Exception) {
@@ -139,9 +142,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getStatus(): String {
-        Log.d(TAG, "getStatus() called ${ZscalerSDK.status()}")
-        tunnelStatus.value = ZscalerSDK.status()
-        return tunnelStatus.value
+        val zscalerSDKTunnelStatus = ZscalerSDK.status()
+        Log.d(TAG, "getStatus() called tunnelType:${zscalerSDKTunnelStatus.tunnelType} status:${zscalerSDKTunnelStatus.tunnelConnectionState}")
+        tunnelConnectionState.value = zscalerSDKTunnelStatus.tunnelConnectionState
+        return tunnelConnectionState.value
     }
 
     fun setSelectedTunnel(tunnelOption: ZDKTunnel) {
@@ -153,17 +157,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startTunnelStatusUpdates(): String {
+        if (::zdkStatusLaunch.isInitialized) {
+            zdkStatusLaunch.cancel()
+        }
         zdkStatusLaunch = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                tunnelStatus.value = ZscalerSDK.status()
-                delay(2000)
-                Log.d(TAG, "startPeriodicStatusUpdate() called status ${tunnelStatus.value}")
+                val status = ZscalerSDK.status()
+                tunnelConnectionState.value = status.tunnelConnectionState
+                Log.d(TAG, "startPeriodicStatusUpdate() called tunnelType:${status.tunnelType} status:${status.tunnelConnectionState}")
                 withContext(Dispatchers.Main) {
-                    zdkStatus.value = ZscalerSDK.status()
+                    zdkTunnelConnectionStateLiveData.value = status.tunnelConnectionState
                 }
+                delay(2000)
             }
         }
-        return tunnelStatus.value
+        return tunnelConnectionState.value
     }
 
     fun stopTunnelStatusUpdates() {
@@ -224,6 +232,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * This API is used ot test the Volley Library.
+     * Refer docs here for the changes to be done to ensure volley testing can be done.
+     * https://confluence.corp.zscaler.com/pages/viewpage.action?pageId=714868625
+     */
+    fun loadGetDataWithVolley(appContext: Context, url:String) {
+        //Set up the proxy first, before sending the request.
+        ZscalerSDK.setUpClient(null, url)
+        VolleyClient.sendVolleyRequest(appContext, url,
+            onResponse = { response, statusCode ->
+                if (statusCode == 200) {
+                    handleVolleyRegularResponse(response)
+                } else {
+                    handleVolleyErrorResponse(response)
+                }
+            },
+            onError = { error ->
+                Log.e(TAG,"Error loadGetDataWithVolley: $error")
+                _responseData.postValue("Network error")
+            }
+        )
+    }
+
     private fun parseRetrofitResponse(response: Response<ResponseBody>) {
         if (response.isSuccessful && response.body() != null) {
             val responseBody = response.body()!!
@@ -274,15 +305,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun handleVolleyRegularResponse(response: String) {
+        try {
+            _responseData.postValue(response)
+        } catch (e: IOException) {
+            e.printStackTrace()
+            _responseData.postValue("Error reading response: ${e.message}")
+        }
+    }
+
     private fun handleErrorResponse(response: Response<ResponseBody>) {
         _responseData.postValue(response.errorBody()?.string() ?: "Unknown error")
     }
+
+    private fun handleVolleyErrorResponse(response: String?) {
+        _responseData.postValue(response ?: "Unknown error")
+    }
 }
 
-fun String.toBase64(): String {
-    val bytes = this.toByteArray(Charsets.UTF_8)
-    return Base64.getEncoder().encodeToString(bytes)
-}
 
 fun String.ensureEndsWithSlash(): String {
     return if (this.endsWith('/')) {

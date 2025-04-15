@@ -12,7 +12,7 @@ object ZdkDialog {
         builder.setMessage(message)
 
         // Add a button to the dialog
-        builder.setPositiveButton("OK") { dialog, which ->
+        builder.setPositiveButton("OK") { dialog, _ ->
             // Dismiss the dialog when the button is clicked
             dialog.dismiss()
         }

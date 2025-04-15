@@ -1,6 +1,6 @@
 
 
-# Zscaler Android SDK
+# Zscaler SDK for Mobile Apps - Android
 
 Zscaler Development Kit (Zscaler SDK), part of the Zscaler Zero Trust Exchange™ platform, combines a set of robust capabilities to protect the integrity of your intellectual property, secure network communications from your mobile application, and prevent breaches against your APIs and core backend services.
 

@@ -20,7 +20,7 @@ class EventLogViewActivity : AppCompatActivity() {
     }
 
     private fun readCSVFromInternalStorage(): List<String> {
-        val csvFile = File(filesDir.absolutePath + "/zdk/events.csv")
+        val csvFile = File(filesDir.absolutePath + "/zdk/events.json")
         val content = mutableListOf<String>()
 
         if (csvFile.exists()) {
