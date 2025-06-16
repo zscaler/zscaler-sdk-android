@@ -13,11 +13,11 @@ plugins {
     id("com.github.triplet.play") version "3.9.1" // for publishing test app bundle to play
 }
 
-val versionFile = File(rootProject.projectDir.parentFile.parentFile.parentFile, "VERSION.txt")
+val versionFile = project.file("../VERSION.txt")
 val versionText = versionFile.readText().trim()
 val versionRegex = Regex("^(\\d+\\.\\d+\\.\\d+)$")
 val matchResult = versionRegex.find(versionText)
-var baseVersion = matchResult?.groupValues?.get(1) ?: "2.0.0"
+var baseVersion = matchResult?.groupValues?.get(1) ?: "2.1.0"
 var versionCodeVal = 1
 if(project.hasProperty("buildBaseVersion")) {
     baseVersion = project.findProperty("buildBaseVersion").toString()
@@ -101,6 +101,9 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
+    }
     buildFeatures {
         viewBinding = true
         buildConfig = true
@@ -182,5 +185,6 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestUtil("androidx.test:orchestrator:1.5.1")
     androidTestImplementation("com.google.code.gson:gson:2.10.1")
 }

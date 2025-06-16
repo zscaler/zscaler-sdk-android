@@ -26,14 +26,6 @@ object ZscalerSDKSetting {
 
     fun getZscalerSDKConfiguration(): ZscalerSDKConfiguration {
         return ZscalerSDKConfiguration(
-            automaticallyConfigureRequests = zscalerSDKConfigurationMap.getOrDefault(
-                SettingType.URL_SESSIONS,
-                false
-            ),
-            automaticallyConfigureWebviews = zscalerSDKConfigurationMap.getOrDefault(
-                SettingType.WEB_VIEWS,
-                false
-            ),
             useProxyAuthentication = zscalerSDKConfigurationMap.getOrDefault(
                 SettingType.PROXY_AUTHENTICATION,
                 false
@@ -61,8 +53,6 @@ object ZscalerSDKSetting {
         zscalerSDKConfigurationMap[SettingType.ENABLE_DEBUG_LOGS] = true
         logLevel = ZscalerSDKConfiguration.LogLevel.debug
         return ZscalerSDKConfiguration(
-            automaticallyConfigureRequests = false,
-            automaticallyConfigureWebviews = false,
             failIfDeviceCompromised = true,
             enableDebugLogsInConsole = true,
             logLevel = ZscalerSDKConfiguration.LogLevel.debug

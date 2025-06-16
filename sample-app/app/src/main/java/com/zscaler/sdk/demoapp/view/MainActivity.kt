@@ -42,9 +42,7 @@ import com.google.firebase.ktx.initialize
 import com.zscaler.sdk.android.ZscalerSDK
 import com.zscaler.sdk.android.configuration.ZscalerSDKConfiguration
 import com.zscaler.sdk.android.exception.ZscalerSDKException
-import com.zscaler.sdk.android.networking.ZscalerSDKRetrofit
 import com.zscaler.sdk.android.notification.ZscalerSDKNotificationEnum
-import com.zscaler.sdk.android.tunnelstatus.ZscalerSDKTunnelStatus
 import com.zscaler.sdk.android.tunnelstatus.ZscalerSDKTunnelType
 import com.zscaler.sdk.demoapp.BuildConfig
 import com.zscaler.sdk.demoapp.R
@@ -306,7 +304,6 @@ class MainActivity : AppCompatActivity() {
             if (toggleButton.isChecked) {
                 // everytime clear any previously manually created retrofit when tunnel status changes.
                 ParentAppRetrofitClient.clearRetroFitInstance()
-                ZscalerSDKRetrofit.clearInstance()
                 registerZDKReceiver()
                 binding.tvPreStatus.text = getString(R.string.status_format, "CONNECTING")
 
@@ -365,7 +362,6 @@ class MainActivity : AppCompatActivity() {
             if (toggleButton.isChecked) {
                 // everytime clear any previously created retrofit when tunnel status changes.
                 ParentAppRetrofitClient.clearRetroFitInstance()
-                ZscalerSDKRetrofit.clearInstance()
                 registerZDKReceiver()
                 binding.tvZeroStatus.text = getString(R.string.status_format, "CONNECTING")
                 binding.tvPreStatus.visibility = View.INVISIBLE

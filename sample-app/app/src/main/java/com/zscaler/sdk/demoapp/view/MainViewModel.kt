@@ -10,7 +10,6 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.zscaler.sdk.android.ZscalerSDK
 import com.zscaler.sdk.android.exception.ZscalerSDKException
-import com.zscaler.sdk.android.tunnelstatus.ZscalerSDKTunnelStatus
 import com.zscaler.sdk.demoapp.constants.ZDKTunnel
 import com.zscaler.sdk.demoapp.networking.ApiService
 import com.zscaler.sdk.demoapp.networking.ParentAppRetrofitClient
@@ -24,6 +23,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.ResponseBody
 import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import java.io.BufferedInputStream
 import java.io.IOException
 import java.util.UUID
@@ -129,11 +130,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         Log.d(TAG, "stopTunnel() called")
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val retVal = ZscalerSDK.stopTunnel()
+                ZscalerSDK.stopTunnel()
                 withContext(Dispatchers.Main) {
-                    if (retVal == 0) {
-                        zdkTunnelConnectionStateLiveData.value = resetStatusText()
-                    }
+                    zdkTunnelConnectionStateLiveData.value = resetStatusText()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "stopTunnel() failed with exception ${e.message}")
@@ -164,7 +163,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             while (true) {
                 val status = ZscalerSDK.status()
                 tunnelConnectionState.value = status.tunnelConnectionState
-                Log.d(TAG, "startPeriodicStatusUpdate() called tunnelType:${status.tunnelType} status:${status.tunnelConnectionState}")
                 withContext(Dispatchers.Main) {
                     zdkTunnelConnectionStateLiveData.value = status.tunnelConnectionState
                 }
@@ -198,7 +196,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadWithSemiAutomaticConfig(url: String, method: Boolean) {
         Log.d(TAG, "loadWithSemiAutomaticConfig() called with: url = $url")
-        val apiService = ZscalerSDK.setUpClient(null, url)?.create(ApiService::class.java)
+        val apiService = Retrofit.Builder()
+            .baseUrl(url)
+            .client(ZscalerSDK.setUpOKHttpClientBuilder(null).build())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build().create(ApiService::class.java)
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val response = if(method) {
@@ -239,7 +241,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun loadGetDataWithVolley(appContext: Context, url:String) {
         //Set up the proxy first, before sending the request.
-        ZscalerSDK.setUpClient(null, url)
+        ZscalerSDK.setUpOKHttpClientBuilder(null)
         VolleyClient.sendVolleyRequest(appContext, url,
             onResponse = { response, statusCode ->
                 if (statusCode == 200) {

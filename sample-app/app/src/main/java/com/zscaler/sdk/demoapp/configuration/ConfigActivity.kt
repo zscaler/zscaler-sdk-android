@@ -27,18 +27,6 @@ class ConfigActivity : AppCompatActivity() {
     private fun initZscalerConfigOption() {
         settingsList = mutableListOf(
             SettingItem(
-                SettingType.URL_SESSIONS,
-                getString(R.string.setting_title_urlsessions),
-                getString(R.string.setting_desc_urlsessions),
-                zscalerSDKConfigurationMap.getOrDefault(SettingType.URL_SESSIONS, false), true
-            ),
-            SettingItem(
-                SettingType.WEB_VIEWS,
-                getString(R.string.setting_title_webviews),
-                getString(R.string.setting_desc_webviews),
-                zscalerSDKConfigurationMap.getOrDefault(SettingType.WEB_VIEWS, false), true
-            ),
-            SettingItem(
                 SettingType.PROXY_AUTHENTICATION,
                 getString(R.string.setting_title_proxy_authentication),
                 getString(R.string.setting_desc_proxy_authentication),
