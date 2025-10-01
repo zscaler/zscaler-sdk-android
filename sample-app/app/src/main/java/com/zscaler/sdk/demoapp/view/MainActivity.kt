@@ -36,6 +36,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.ktx.initialize
@@ -485,7 +486,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.clearLogsButton.setOnClickListener {
             mainViewModel.clearLogs(onSuccess = {
-                Toast.makeText(this, getString(R.string.zdk_log_cleared), Toast.LENGTH_LONG).show()
+                    Snackbar.make(findViewById(android.R.id.content), getString(R.string.zdk_log_cleared), Snackbar.LENGTH_LONG).show()
             })
         }
     }
@@ -514,7 +515,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchShareIntentLogZip(it: String) {
-        Toast.makeText(this, getString(R.string.saved_to_download), Toast.LENGTH_LONG).show()
+        Snackbar.make(findViewById(android.R.id.content), getString(R.string.saved_to_download), Snackbar.LENGTH_LONG).show()
         lifecycleScope.launch(Dispatchers.IO) {
             mainViewModel.exportLog(it)
             val logZipFile = File(this@MainActivity.filesDir, logsZipFileName)

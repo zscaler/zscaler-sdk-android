@@ -3,6 +3,7 @@ import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import com.github.triplet.gradle.androidpublisher.ReleaseStatus
 import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
 import com.google.firebase.crashlytics.buildtools.gradle.tasks.GenerateSymbolFileTask
+import java.io.File;
 
 plugins {
     id("com.android.application")
@@ -11,6 +12,11 @@ plugins {
     id("com.google.gms.google-services") version "4.4.2"
     id("com.google.firebase.crashlytics") version "3.0.2"
     id("com.github.triplet.play") version "3.9.1" // for publishing test app bundle to play
+}
+
+val isAndroidTest = gradle.startParameter.taskNames.any {
+    it.contains("connected", ignoreCase = true) || // connectedDebugAndroidTest etc.
+    it.contains("androidTest", ignoreCase = true)
 }
 
 val versionFile = project.file("../VERSION.txt")
@@ -26,12 +32,12 @@ if(project.hasProperty("buildBaseVersion")) {
 var finalVersion = baseVersion
 rootProject.version =  baseVersion
 
-//Add the buildNumber to test app to fetch the right build from nexus
-var buildNumber = ""
-if(project.hasProperty("buildNumber")) {
-    buildNumber = project.findProperty("buildNumber").toString()
-    println("buildNumber $buildNumber")
-    finalVersion = "$finalVersion.$buildNumber"
+var buildQualifier = "LOCAL"
+if(project.hasProperty("buildQualifier")) {
+    buildQualifier = project.findProperty("buildQualifier").toString()
+}
+if(buildQualifier != "") {
+    finalVersion = "$finalVersion-$buildQualifier"
 }
 
 // calculate version code from final version name
@@ -41,9 +47,38 @@ if (versionCodeInt > versionCodeVal) {
     versionCodeVal = versionCodeInt
 }
 
+fun getGitRoot(): File {
+    val os = org.apache.commons.io.output.ByteArrayOutputStream()
+    project.exec {
+        commandLine = "git rev-parse --show-toplevel".split(" ")
+        standardOutput = os
+    }
+    return File(String(os.toByteArray()).trim())
+}
+
 android {
     namespace = "com.zscaler.sdk.demoapp"
     compileSdk = 35
+
+    // Add test config files from common location
+    sourceSets {
+        println("🔍 Checking sourceSets. isAndroidTest = $isAndroidTest")
+        if (isAndroidTest) {
+            val mainSourceSet = sourceSets.getByName("main")
+            val testAssets = getGitRoot()
+                .resolve("config/Tests/ConfigResources")
+                .normalize()
+            println("📁 TestAssets directory path resolved to: $testAssets")
+            if (testAssets.exists()) {
+                println("✅ TestAssets directory exists, include files as app assets")
+                mainSourceSet.assets.setSrcDirs(
+                    mainSourceSet.assets.srcDirs + testAssets
+                )
+            } else {
+                throw GradleException("❌ TestAssets directory not found at: $testAssets")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.zscaler.sdk.android.testapp"
@@ -172,7 +207,16 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.android.volley:volley:1.2.1")
     // zdk dependency
-    implementation("com.zscaler.sdk:zscalersdk-android:latest.release")
+    implementation("com.zscaler.sdk:zscalersdk-android:latest.release") {
+        // when we import this dep with --include-build, we need to set the 
+        // build type attribute so that proguard is tested properly
+        attributes {
+            attribute(com.android.build.api.attributes.BuildTypeAttr.ATTRIBUTE, project.objects.named(
+                com.android.build.api.attributes.BuildTypeAttr::class.java, "release"
+            ))
+        }
+    }
+
 
     // Firebase crashlytics
     implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
@@ -187,4 +231,10 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestUtil("androidx.test:orchestrator:1.5.1")
     androidTestImplementation("com.google.code.gson:gson:2.10.1")
+
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation("androidx.test:rules:1.5.0")
+    androidTestImplementation("androidx.test.espresso:espresso-web:3.5.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.2.0")
+
 }
