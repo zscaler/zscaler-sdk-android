@@ -19,11 +19,17 @@ val isAndroidTest = gradle.startParameter.taskNames.any {
     it.contains("androidTest", ignoreCase = true)
 }
 
-val versionFile = project.file("../VERSION.txt")
+val gitHubVersionFile = getGitRoot().resolve("sample-app/VERSION.txt")
+val versionFile = if (gitHubVersionFile.exists()) {
+    gitHubVersionFile
+} else {
+    //This is for local development
+    getGitRoot().resolve("VERSION.txt")
+}
 val versionText = versionFile.readText().trim()
 val versionRegex = Regex("^(\\d+\\.\\d+\\.\\d+)$")
 val matchResult = versionRegex.find(versionText)
-var baseVersion = matchResult?.groupValues?.get(1) ?: "2.1.0"
+var baseVersion = matchResult?.groupValues?.get(1) ?: "3.1.0"
 var versionCodeVal = 1
 if(project.hasProperty("buildBaseVersion")) {
     baseVersion = project.findProperty("buildBaseVersion").toString()
@@ -70,12 +76,12 @@ android {
                 .normalize()
             println("📁 TestAssets directory path resolved to: $testAssets")
             if (testAssets.exists()) {
-                println("✅ TestAssets directory exists, include files as app assets")
+                println("TestAssets directory exists, include files as app assets")
                 mainSourceSet.assets.setSrcDirs(
                     mainSourceSet.assets.srcDirs + testAssets
                 )
             } else {
-                throw GradleException("❌ TestAssets directory not found at: $testAssets")
+                throw GradleException("TestAssets directory not found at: $testAssets")
             }
         }
     }
