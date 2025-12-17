@@ -43,4 +43,10 @@
     <string name="log_level_info">Info</string>
     <string name="log_level_error">Error</string>
     <string name="log_level_title">Log Level</string>
+    
+    <!-- Bottom Navigation Titles -->
+    <string name="title_tunnel">Tunnel</string>
+    <string name="title_requests">Request</string>
+    <string name="title_logs">Logs</string>
+    <string name="title_settings">Settings</string>
 </resources>

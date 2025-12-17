@@ -24,11 +24,6 @@
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
             android:exported="false" />
 
-        <activity
-            android:name=".view.EventLogViewActivity"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-            android:exported="false" />
-
         <service
             android:name=".service.NotificationCancellationService"
             android:enabled="true"
@@ -39,7 +34,7 @@
             android:name=".view.MainActivity"
             android:exported="true"
             android:launchMode="singleInstance"
-            android:theme="@style/Theme.AppCompat.Light"
+            android:theme="@style/Theme.MyApplication"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

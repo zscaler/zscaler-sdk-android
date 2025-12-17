@@ -5,7 +5,9 @@ import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
 import com.zscaler.sdk.android.ZscalerSDK
 
-class AppLifecycleObserver : LifecycleObserver {
+class AppLifecycleObserver() : LifecycleObserver {
+    private val TAG = "AppLifecycleObserver"
+    
     @OnLifecycleEvent(Lifecycle.Event.ON_START)
     fun onAppForeground() {
         // Call this as soon as app comes to foreground or network requests are going to be resumed, whichever is earlier.

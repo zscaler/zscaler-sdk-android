@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/navigation_tunnel"
+        android:icon="@drawable/ic_tunnel"
+        android:title="@string/title_tunnel" />
+
+    <item
+        android:id="@+id/navigation_requests"
+        android:icon="@drawable/ic_requests"
+        android:title="@string/title_requests" />
+
+    <item
+        android:id="@+id/navigation_logs"
+        android:icon="@drawable/ic_logs"
+        android:title="@string/title_logs" />
+
+    <item
+        android:id="@+id/navigation_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/title_settings" />
+
+</menu>
