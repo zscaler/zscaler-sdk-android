@@ -25,6 +25,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -40,7 +41,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -78,14 +78,15 @@ fun LogsScreen(viewModel: LogsViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
+            .background(MaterialTheme.colorScheme.background)
+            .padding(paddingValues)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Actions Section
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
@@ -95,7 +96,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                 Text(
                     text = "ACTIONS",
                     fontSize = 12.sp,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -104,7 +105,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
         // Export Logs Button
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Row(
@@ -117,7 +118,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                 Icon(
                     imageVector = Icons.Default.FileDownload,
                     contentDescription = "Export",
-                    tint = Color(0xFF007AFF),
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
                 
@@ -137,7 +138,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                 ) {
                     Text(
                         text = "Export Logs",
-                        color = Color(0xFF007AFF),
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 16.sp,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -148,7 +149,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
         // Clear Logs Button
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Row(
@@ -161,7 +162,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Clear",
-                    tint = Color(0xFFFF3B30),
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(24.dp)
                 )
                 
@@ -181,7 +182,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                 ) {
                     Text(
                         text = "Clear Logs",
-                        color = Color(0xFFFF3B30),
+                        color = MaterialTheme.colorScheme.error,
                         fontSize = 16.sp,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -192,7 +193,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
         // Events Section
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Row(
@@ -205,7 +206,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                 Text(
                     text = "EVENTS",
                     fontSize = 12.sp,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     fontWeight = FontWeight.Medium
                 )
                 
@@ -217,7 +218,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh",
-                        tint = Color(0xFF007AFF)
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -238,7 +239,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Box(
@@ -247,7 +248,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                 ) {
                     Text(
                         text = "No logs available",
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         fontSize = 14.sp
                     )
                 }
@@ -257,7 +258,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 LazyColumn(
@@ -272,7 +273,7 @@ fun LogsScreen(viewModel: LogsViewModel) {
                             fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
                             lineHeight = 16.sp,
-                            color = Color.Black
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Divider(modifier = Modifier.padding(vertical = 4.dp))
                     }

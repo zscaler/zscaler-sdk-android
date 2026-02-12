@@ -26,6 +26,10 @@ class TunnelViewModel(application: Application) : AndroidViewModel(application) 
     var tunnelConnectionState = mutableStateOf("")
     var zdkTunnelConnectionStateLiveData: MutableLiveData<String> = MutableLiveData()
     
+    // Persisted credentials
+    var accessKey = mutableStateOf(application.getString(com.zscaler.sdk.demoapp.R.string.zscaler_id))
+    var accessToken = mutableStateOf(application.getString(com.zscaler.sdk.demoapp.R.string.zscaler_access_token))
+    
     private lateinit var zdkStatusLaunch: Job
     private val userRepository: UserRepository = SharedPrefsUserRepository(application)
     private val tunnelRepository: TunnelRepository = TunnelRepository()

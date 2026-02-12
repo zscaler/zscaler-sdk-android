@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,12 +49,14 @@ data class NotificationItem(val message: String, val timestamp: Long)
 @Composable
 fun TunnelScreen(viewModel: TunnelViewModel) {
     val context = LocalContext.current
-    var accessKey by remember { mutableStateOf(context.getString(com.zscaler.sdk.demoapp.R.string.zscaler_id)) }
-    var accessToken by remember { mutableStateOf(context.getString(com.zscaler.sdk.demoapp.R.string.zscaler_access_token)) }
+    var accessKey by viewModel.accessKey
+    var accessToken by viewModel.accessToken
     var tunnelState by remember { mutableStateOf("OFF") }
     var tunnelType by remember { mutableStateOf("") }
     val tunnelStatus by viewModel.zdkTunnelConnectionStateLiveData.observeAsState("OFF")
     val notifications = remember { mutableStateListOf<NotificationItem>() }
+    var accessKeyError by remember { mutableStateOf<String?>(null) }
+    var accessTokenError by remember { mutableStateOf<String?>(null) }
 
     // Update tunnel state when status changes
     LaunchedEffect(tunnelStatus) {
@@ -114,7 +117,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -122,7 +125,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
@@ -132,25 +135,49 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                     Text(
                         text = "CREDENTIALS",
                         fontSize = 12.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         fontWeight = FontWeight.Medium
                     )
                     
                     OutlinedTextField(
                         value = accessKey,
-                        onValueChange = { accessKey = it },
+                        onValueChange = { 
+                            accessKey = it
+                            accessKeyError = null
+                        },
                         label = { Text("Access Key") },
                         modifier = Modifier.fillMaxWidth().testTag("zdk_id_text_field"),
-                        singleLine = true
+                        singleLine = true,
+                        isError = accessKeyError != null
                     )
+                    accessKeyError?.let {
+                        Text(
+                            text = it,
+                            color = Color.Red,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(start = 16.dp)
+                        )
+                    }
                     
                     OutlinedTextField(
                         value = accessToken,
-                        onValueChange = { accessToken = it },
+                        onValueChange = { 
+                            accessToken = it
+                            accessTokenError = null
+                        },
                         label = { Text("Access Token") },
                         modifier = Modifier.fillMaxWidth().testTag("access_token_text_field"),
-                        singleLine = true
+                        singleLine = true,
+                        isError = accessTokenError != null
                     )
+                    accessTokenError?.let {
+                        Text(
+                            text = it,
+                            color = Color.Red,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(start = 16.dp)
+                        )
+                    }
                 }
             }
         }
@@ -159,7 +186,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
@@ -169,26 +196,32 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                     Text(
                         text = "TUNNEL CONTROL",
                         fontSize = 12.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         fontWeight = FontWeight.Medium
                     )
                     
                     Button(
                         onClick = {
-                            if (accessKey.isNotBlank()) {
-                                viewModel.startPreLoginTunnel(
-                                    appKey = accessKey,
-                                    udid = viewModel.getUdid("random_udid"),
-                                    onErrorOccurred = { errorCode ->
-                                        tunnelState = "ERROR: $errorCode"
-                                        viewModel.stopTunnelStatusUpdates()
-                                    }
-                                )
-                                viewModel.startTunnelStatusUpdates()
-                                // Immediately update tunnel type
-                                val status = ZscalerSDK.status()
-                                tunnelType = status.tunnelType.toString()
+                            accessKeyError = null
+                            accessTokenError = null
+                            
+                            if (accessKey.isBlank()) {
+                                accessKeyError = "App Key is empty"
+                                return@Button
                             }
+                            
+                            viewModel.startPreLoginTunnel(
+                                appKey = accessKey,
+                                udid = viewModel.getUdid("random_udid"),
+                                onErrorOccurred = { errorCode ->
+                                    tunnelState = "ERROR: $errorCode"
+                                    viewModel.stopTunnelStatusUpdates()
+                                }
+                            )
+                            viewModel.startTunnelStatusUpdates()
+                            // Immediately update tunnel type
+                            val status = ZscalerSDK.status()
+                            tunnelType = status.tunnelType.toString()
                         },
                         modifier = Modifier.fillMaxWidth().testTag("pre_login_toggle"),
                         colors = ButtonDefaults.buttonColors(
@@ -204,21 +237,32 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                     
                     Button(
                         onClick = {
-                            if (accessKey.isNotBlank() && accessToken.isNotBlank()) {
-                                viewModel.startZeroTrustTunnel(
-                                    appKey = accessKey,
-                                    accessToken = accessToken,
-                                    udid = viewModel.getUdid("random_udid"),
-                                    onErrorOccurred = { errorCode ->
-                                        tunnelState = "ERROR: $errorCode"
-                                        viewModel.stopTunnelStatusUpdates()
-                                    }
-                                )
-                                viewModel.startTunnelStatusUpdates()
-                                // Immediately update tunnel type
-                                val status = ZscalerSDK.status()
-                                tunnelType = status.tunnelType.toString()
+                            accessKeyError = null
+                            accessTokenError = null
+                            
+                            if (accessKey.isBlank()) {
+                                accessKeyError = "App Key is empty"
+                                return@Button
                             }
+                            
+                            if (accessToken.isBlank()) {
+                                accessTokenError = "Auth Token is empty"
+                                return@Button
+                            }
+                            
+                            viewModel.startZeroTrustTunnel(
+                                appKey = accessKey,
+                                accessToken = accessToken,
+                                udid = viewModel.getUdid("random_udid"),
+                                onErrorOccurred = { errorCode ->
+                                    tunnelState = "ERROR: $errorCode"
+                                    viewModel.stopTunnelStatusUpdates()
+                                }
+                            )
+                            viewModel.startTunnelStatusUpdates()
+                            // Immediately update tunnel type
+                            val status = ZscalerSDK.status()
+                            tunnelType = status.tunnelType.toString()
                         },
                         modifier = Modifier.fillMaxWidth().testTag("zero_trust_toggle"),
                         colors = ButtonDefaults.buttonColors(
@@ -234,7 +278,9 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                     
                     Button(
                         onClick = {
-                            viewModel.stopTunnel { "OFF" }
+                            if (tunnelState != "OFF") {
+                                viewModel.stopTunnel { "OFF" }
+                            }
                             viewModel.stopTunnelStatusUpdates()
                             tunnelState = "OFF"
                             tunnelType = ""
@@ -258,7 +304,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
@@ -268,7 +314,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                     Text(
                         text = "STATUS",
                         fontSize = 12.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         fontWeight = FontWeight.Medium
                     )
                     
@@ -278,11 +324,12 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                     ) {
                         Text(
                             text = "State:",
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = tunnelState,
-                            color = if (tunnelState == "ON") Color(0xFF34C759) else Color.Black,
+                            color = if (tunnelState == "ON") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.testTag("tv_tunnel_status")
                         )
                     }
@@ -294,9 +341,13 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                         ) {
                             Text(
                                 text = "Type:",
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
-                            Text(text = tunnelType)
+                            Text(
+                                text = tunnelType,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
                 }
@@ -308,7 +359,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
@@ -318,7 +369,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                         Text(
                             text = "NOTIFICATIONS",
                             fontSize = 12.sp,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -328,7 +379,9 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
             items(notifications.take(5)) { notification ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9E6)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(
@@ -337,13 +390,14 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                         Text(
                             text = notification.message,
                             fontSize = 14.sp,
-                            lineHeight = 20.sp
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
                             text = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
                                 .format(java.util.Date(notification.timestamp)),
                             fontSize = 12.sp,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }

@@ -24,7 +24,9 @@ fun ZDKTestAppTheme(
         background = colorResource(R.color.light_background),
         surface = colorResource(R.color.light_surface),
         onSurface = colorResource(R.color.light_on_surface),
-        error = colorResource(R.color.light_error)
+        error = colorResource(R.color.light_error),
+        secondaryContainer = colorResource(R.color.light_secondary_container),
+        onSecondaryContainer = colorResource(R.color.light_on_secondary_container)
     )
 
     val darkColorScheme = darkColorScheme(
@@ -35,7 +37,9 @@ fun ZDKTestAppTheme(
         background = colorResource(R.color.dark_background),
         surface = colorResource(R.color.dark_surface),
         onSurface = colorResource(R.color.dark_on_surface),
-        error = colorResource(R.color.dark_error)
+        error = colorResource(R.color.dark_error),
+        secondaryContainer = colorResource(R.color.dark_secondary_container),
+        onSecondaryContainer = colorResource(R.color.dark_on_secondary_container)
     )
 
     val colorScheme = if (darkTheme) darkColorScheme else lightColorScheme

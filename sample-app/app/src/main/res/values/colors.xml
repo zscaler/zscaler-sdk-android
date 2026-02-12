@@ -24,4 +24,8 @@
     <color name="dark_surface">#FF1C1C1E</color>
     <color name="dark_on_surface">#FFFFFFFF</color>
     <color name="dark_error">#FFFF453A</color>
+    <color name="light_secondary_container">#FFFFF9E6</color>
+    <color name="light_on_secondary_container">#FF000000</color>
+    <color name="dark_secondary_container">#FF2C2C2E</color>
+    <color name="dark_on_secondary_container">#FFFFFFFF</color>
 </resources>

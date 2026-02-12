@@ -34,7 +34,12 @@ class TunnelRepository {
      */
     suspend fun stopTunnel() {
         Log.d(TAG, "Stopping tunnel")
-        ZscalerSDK.stopTunnel()
+        val status = ZscalerSDK.status()
+        if (status.tunnelConnectionState != "OFF") {
+            ZscalerSDK.stopTunnel()
+        } else {
+            Log.d(TAG, "Tunnel is already stopped, skipping stopTunnel call")
+        }
     }
 
     /**
