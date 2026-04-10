@@ -1,13 +1,9 @@
 package com.zscaler.sdk.demoapp.view
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -48,7 +44,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var requestViewModel: RequestViewModel
     private lateinit var logsViewModel: LogsViewModel
     private lateinit var settingsViewModel: SettingsViewModel
-    private val requestNotificationCode = 101
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,13 +63,6 @@ class MainActivity : ComponentActivity() {
         requestViewModel = viewModelProvider[RequestViewModel::class.java]
         logsViewModel = viewModelProvider[LogsViewModel::class.java]
         settingsViewModel = viewModelProvider[SettingsViewModel::class.java]
-
-        // Request notification permission for Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermission()
-            }
-        }
 
         setContent {
             ZDKTestAppTheme {
@@ -96,10 +84,6 @@ class MainActivity : ComponentActivity() {
         FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(!BuildConfig.DEBUG)
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    private fun requestNotificationPermission() {
-        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), requestNotificationCode)
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

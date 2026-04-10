@@ -2,13 +2,14 @@ package com.zscaler.sdk.demoapp.viewmodel
 
 import android.app.Application
 import android.util.Log
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.zscaler.sdk.android.ZscalerSDK
 import com.zscaler.sdk.android.exception.ZscalerSDKException
 import com.zscaler.sdk.demoapp.constants.ZDKTunnel
+import com.zscaler.sdk.demoapp.ui.screens.NotificationItem
 import com.zscaler.sdk.demoapp.repository.SharedPrefsUserRepository
 import com.zscaler.sdk.demoapp.repository.TunnelRepository
 import com.zscaler.sdk.demoapp.repository.UserRepository
@@ -29,6 +30,12 @@ class TunnelViewModel(application: Application) : AndroidViewModel(application) 
     // Persisted credentials
     var accessKey = mutableStateOf(application.getString(com.zscaler.sdk.demoapp.R.string.zscaler_id))
     var accessToken = mutableStateOf(application.getString(com.zscaler.sdk.demoapp.R.string.zscaler_access_token))
+
+    // State that must survive tab switches
+    var tunnelState = mutableStateOf("OFF")
+    var tunnelType = mutableStateOf("")
+    var clientPublicIp = mutableStateOf("")
+    val notifications = mutableStateListOf<NotificationItem>()
     
     private lateinit var zdkStatusLaunch: Job
     private val userRepository: UserRepository = SharedPrefsUserRepository(application)
@@ -60,6 +67,9 @@ class TunnelViewModel(application: Application) : AndroidViewModel(application) 
                 tunnelRepository.startPreLoginTunnel(appKey = appKey, deviceUdid = udid)
                 val status = tunnelRepository.getTunnelStatus()
                 tunnelConnectionState.value = status.tunnelConnectionState
+                withContext(Dispatchers.Main) {
+                    zdkTunnelConnectionStateLiveData.value = status.tunnelConnectionState
+                }
                 setSelectedTunnel(ZDKTunnel.PRELOGIN)
                 Log.d(TAG, "startPreLoginTunnel completed")
             } catch (e: Exception) {
@@ -93,6 +103,9 @@ class TunnelViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 val status = tunnelRepository.getTunnelStatus()
                 tunnelConnectionState.value = status.tunnelConnectionState
+                withContext(Dispatchers.Main) {
+                    zdkTunnelConnectionStateLiveData.value = status.tunnelConnectionState
+                }
                 setSelectedTunnel(ZDKTunnel.ZEROTRUST)
                 Log.d(TAG, "startZeroTrustTunnel completed")
             } catch (e: Exception) {

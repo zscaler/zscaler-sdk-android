@@ -28,7 +28,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,6 +41,10 @@ import androidx.compose.ui.unit.sp
 import com.zscaler.sdk.android.ZscalerSDK
 import com.zscaler.sdk.android.notification.ZscalerSDKNotificationEnum
 import com.zscaler.sdk.demoapp.viewmodel.TunnelViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class NotificationItem(val message: String, val timestamp: Long)
 
@@ -51,25 +54,24 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
     val context = LocalContext.current
     var accessKey by viewModel.accessKey
     var accessToken by viewModel.accessToken
-    var tunnelState by remember { mutableStateOf("OFF") }
-    var tunnelType by remember { mutableStateOf("") }
+    var tunnelState by viewModel.tunnelState
+    var tunnelType by viewModel.tunnelType
+    var clientPublicIp by viewModel.clientPublicIp
     val tunnelStatus by viewModel.zdkTunnelConnectionStateLiveData.observeAsState("OFF")
-    val notifications = remember { mutableStateListOf<NotificationItem>() }
+    val notifications = viewModel.notifications
     var accessKeyError by remember { mutableStateOf<String?>(null) }
     var accessTokenError by remember { mutableStateOf<String?>(null) }
 
     // Update tunnel state when status changes
     LaunchedEffect(tunnelStatus) {
         tunnelState = tunnelStatus
-        val status = ZscalerSDK.status()
-        tunnelType = status.tunnelType.toString()
     }
     
     // Continuously poll tunnel type to ensure it stays updated
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(1000) // Poll every second
-            val status = ZscalerSDK.status()
+            kotlinx.coroutines.delay(1000) // Poll every 1 second
+            val status = withContext(Dispatchers.IO) { ZscalerSDK.status() }
             tunnelType = status.tunnelType.toString()
         }
     }
@@ -88,11 +90,20 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                         System.currentTimeMillis()
                     ))
                     
-                    // Update tunnel type when tunnel state changes
+                    // Update tunnel type and public IP when tunnel state changes
                     if (notificationCode == ZscalerSDKNotificationEnum.ZSCALERSDK_TUNNEL_CONNECTED.ordinal ||
                         notificationCode == ZscalerSDKNotificationEnum.ZSCALERSDK_TUNNEL_DISCONNECTED.ordinal) {
-                        val status = ZscalerSDK.status()
-                        tunnelType = status.tunnelType.toString()
+                        GlobalScope.launch(Dispatchers.IO) {
+                            val status = ZscalerSDK.status()
+                            tunnelType = status.tunnelType.toString()
+                            
+                            if (notificationCode == ZscalerSDKNotificationEnum.ZSCALERSDK_TUNNEL_CONNECTED.ordinal) {
+                                val ip = ZscalerSDK.getClientPublicIp()
+                                if (ip.isNotEmpty()) {
+                                    clientPublicIp = ip
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -210,6 +221,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                                 return@Button
                             }
                             
+                            viewModel.stopTunnelStatusUpdates()
                             viewModel.startPreLoginTunnel(
                                 appKey = accessKey,
                                 udid = viewModel.getUdid("random_udid"),
@@ -219,9 +231,6 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                                 }
                             )
                             viewModel.startTunnelStatusUpdates()
-                            // Immediately update tunnel type
-                            val status = ZscalerSDK.status()
-                            tunnelType = status.tunnelType.toString()
                         },
                         modifier = Modifier.fillMaxWidth().testTag("pre_login_toggle"),
                         colors = ButtonDefaults.buttonColors(
@@ -250,6 +259,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                                 return@Button
                             }
                             
+                            viewModel.stopTunnelStatusUpdates()
                             viewModel.startZeroTrustTunnel(
                                 appKey = accessKey,
                                 accessToken = accessToken,
@@ -260,9 +270,6 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                                 }
                             )
                             viewModel.startTunnelStatusUpdates()
-                            // Immediately update tunnel type
-                            val status = ZscalerSDK.status()
-                            tunnelType = status.tunnelType.toString()
                         },
                         modifier = Modifier.fillMaxWidth().testTag("zero_trust_toggle"),
                         colors = ButtonDefaults.buttonColors(
@@ -284,6 +291,7 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                             viewModel.stopTunnelStatusUpdates()
                             tunnelState = "OFF"
                             tunnelType = ""
+                            clientPublicIp = ""
                         },
                         modifier = Modifier.fillMaxWidth().testTag("stop_tunnel_button"),
                         colors = ButtonDefaults.buttonColors(
@@ -347,6 +355,24 @@ fun TunnelScreen(viewModel: TunnelViewModel) {
                             Text(
                                 text = tunnelType,
                                 color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                    
+                    if (clientPublicIp.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Public IP:",
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = clientPublicIp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.testTag("tv_client_public_ip")
                             )
                         }
                     }

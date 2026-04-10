@@ -62,7 +62,7 @@ class NetworkRepository {
             } else {
                 Result.failure(IOException("API service is null"))
             }
-        } catch (e: IOException) {
+        } catch (e: Exception) {
             Log.e(TAG, "Error in loadWithSemiAutomaticConfig", e)
             Result.failure(e)
         }
