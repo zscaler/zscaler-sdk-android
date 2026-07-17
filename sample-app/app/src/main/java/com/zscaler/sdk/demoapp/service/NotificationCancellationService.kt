@@ -42,13 +42,13 @@ class NotificationCancellationService : Service() {
         createNotificationChannel()
         
         // Register broadcast receiver for tunnel status updates from Zscaler SDK
-        // Use RECEIVER_EXPORTED because we're receiving broadcasts from the SDK (external component)
+        // Use RECEIVER_NOT_EXPORTED — the broadcast is app-internal (same process/signature)
         val filter = IntentFilter(ZscalerSDK.ZSCALER_RECEIVER_ID)
         ContextCompat.registerReceiver(
             this,
             notificationReceiver,
             filter,
-            ContextCompat.RECEIVER_EXPORTED
+            ContextCompat.RECEIVER_NOT_EXPORTED
         )
     }
 
